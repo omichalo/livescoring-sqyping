@@ -1,0 +1,61 @@
+import { useState } from "react";
+import {
+  Paper,
+  TextField,
+  Button,
+  Typography,
+  Stack,
+  Alert,
+} from "@mui/material";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase";
+import { useNavigate, useLocation } from "react-router-dom";
+
+export const LoginPage = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogin = async () => {
+    setError(null);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Rediriger vers la page d'origine ou vers l'accueil
+      const from = (location.state as any)?.from?.pathname || "/";
+      navigate(from, { replace: true });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err: unknown) {
+      setError("Identifiants invalides ou erreur de connexion.");
+    }
+  };
+
+  return (
+    <Paper sx={{ maxWidth: 400, mx: "auto", mt: 8, p: 4 }}>
+      <Typography variant="h5" gutterBottom>
+        Connexion
+      </Typography>
+      <Stack spacing={2}>
+        <TextField
+          label="Email"
+          type="email"
+          fullWidth
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <TextField
+          label="Mot de passe"
+          type="password"
+          fullWidth
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Button variant="contained" onClick={handleLogin}>
+          Se connecter
+        </Button>
+        {error && <Alert severity="error">{error}</Alert>}
+      </Stack>
+    </Paper>
+  );
+};

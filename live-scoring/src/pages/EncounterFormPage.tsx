@@ -129,12 +129,17 @@ export const EncounterFormPage: React.FC = () => {
           });
 
           // Mettre à jour la rencontre
-          await updateDoc(encounterRef, {
+          const updateData: Record<string, unknown> = {
             name: name.trim(),
-            description: description.trim() || undefined,
             numberOfTables: numberOfTables,
             updatedAt: now,
-          });
+          };
+          
+          if (description.trim()) {
+            updateData.description = description.trim();
+          }
+          
+          await updateDoc(encounterRef, updateData);
 
           console.log("Rencontre et équipes mises à jour");
         }
@@ -164,9 +169,8 @@ export const EncounterFormPage: React.FC = () => {
 
         // Créer la rencontre
         const encounterRef = doc(collection(db, "encounters"));
-        batch.set(encounterRef, {
+        const encounterData: Record<string, unknown> = {
           name: name.trim(),
-          description: description.trim() || undefined,
           team1Id: team1Ref.id,
           team2Id: team2Ref.id,
           numberOfTables: numberOfTables,
@@ -174,7 +178,13 @@ export const EncounterFormPage: React.FC = () => {
           isCurrent: false,
           createdAt: now,
           updatedAt: now,
-        });
+        };
+        
+        if (description.trim()) {
+          encounterData.description = description.trim();
+        }
+        
+        batch.set(encounterRef, encounterData);
 
         await batch.commit();
         console.log("Rencontre et équipes créées");

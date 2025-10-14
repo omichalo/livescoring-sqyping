@@ -3,17 +3,45 @@ import { Box, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { Match, Team } from "../types";
 
-// Fonction pour calculer la taille de police adaptative selon la longueur du nom
+// Fonction pour calculer la taille de police adaptative selon la largeur du nom
 const getAdaptiveFontSize = (
   name: string,
   baseFontSize: number,
-  maxLength: number
+  maxWidthChars: number
 ): number => {
-  if (name.length <= maxLength) return baseFontSize;
+  // Estimation plus précise de la largeur des caractères
+  const getEstimatedWidth = (text: string, fontSize: number): number => {
+    // Coefficients approximatifs pour différentes largeurs de caractères
+    let width = 0;
+    for (const char of text) {
+      if (char === ' ') {
+        width += 0.3; // Espace
+      } else if ('ijl|'.includes(char)) {
+        width += 0.4; // Caractères étroits
+      } else if ('mwMW'.includes(char)) {
+        width += 0.9; // Caractères larges
+      } else if ('ABCDEFGHKLMNOPQRSTUVXYZ'.includes(char)) {
+        width += 0.7; // Majuscules moyennes
+      } else {
+        width += 0.6; // Caractères standard
+      }
+    }
+    return width * fontSize;
+  };
+
+  const estimatedWidth = getEstimatedWidth(name, baseFontSize);
+  const targetWidth = maxWidthChars * baseFontSize * 0.6; // Facteur moyen
+
+  if (estimatedWidth <= targetWidth) return baseFontSize;
+
+  // Calculer le facteur de réduction nécessaire
+  const scaleFactor = targetWidth / estimatedWidth;
   
-  // Réduire la taille de police proportionnellement à la longueur excessive
-  const scaleFactor = maxLength / name.length;
-  return baseFontSize * scaleFactor;
+  // Appliquer une réduction minimale pour éviter les polices trop petites
+  const minScaleFactor = 0.4;
+  const finalScaleFactor = Math.max(scaleFactor, minScaleFactor);
+  
+  return baseFontSize * finalScaleFactor;
 };
 
 interface CustomLayout {
@@ -814,7 +842,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                       fontSize: `${getAdaptiveFontSize(
                         team1.name,
                         scale < 1 ? 1.1 : 1.8,
-                        15
+                        18
                       )}rem`,
                       textAlign: "left",
                     }}
@@ -876,7 +904,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                       fontSize: `${getAdaptiveFontSize(
                         team2.name,
                         scale < 1 ? 1.1 : 1.8,
-                        15
+                        18
                       )}rem`,
                       textAlign: "left",
                     }}
@@ -972,7 +1000,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                               upcomingMatches[0]?.player2.name || "Joueur 2"
                             }`,
                             scale < 1 ? 1.0 : 1.5,
-                            35
+                            45
                           )}rem`,
                     mb: 0.3 * scale,
                     textAlign: "center",
@@ -1015,7 +1043,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                               upcomingMatches[1]?.player2.name || "Joueur 2"
                             }`,
                             scale < 1 ? 1.0 : 1.5,
-                            35
+                            45
                           )}rem`
                       : scale < 1
                       ? "1.0rem"
@@ -1103,7 +1131,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                         fontSize: `${getAdaptiveFontSize(
                           orderedMatch?.player1.name || "Joueur 1",
                           scale < 1 ? 1.1 : 1.8,
-                          22
+                          28
                         )}rem`,
                         textAlign: "left",
                       }}
@@ -1182,7 +1210,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                         fontSize: `${getAdaptiveFontSize(
                           orderedMatch?.player2.name || "Joueur 2",
                           scale < 1 ? 1.1 : 1.8,
-                          22
+                          28
                         )}rem`,
                         textAlign: "left",
                       }}

@@ -7,41 +7,43 @@ import type { Match, Team } from "../types";
 const getAdaptiveFontSize = (
   name: string,
   baseFontSize: number,
-  maxWidthChars: number
+  maxWidthRem: number
 ): number => {
-  // Estimation plus précise de la largeur des caractères
-  const getEstimatedWidth = (text: string, fontSize: number): number => {
-    // Coefficients approximatifs pour différentes largeurs de caractères
+  // Estimation de la largeur en "em" (unités relatives à la taille de police)
+  const getEstimatedWidthInEm = (text: string): number => {
     let width = 0;
     for (const char of text) {
-      if (char === ' ') {
-        width += 0.3; // Espace
-      } else if ('ijl|'.includes(char)) {
-        width += 0.4; // Caractères étroits
-      } else if ('mwMW'.includes(char)) {
-        width += 0.9; // Caractères larges
-      } else if ('ABCDEFGHKLMNOPQRSTUVXYZ'.includes(char)) {
-        width += 0.7; // Majuscules moyennes
+      if (char === " ") {
+        width += 0.25; // Espace
+      } else if ("ijl|!".includes(char)) {
+        width += 0.35; // Caractères très étroits
+      } else if ("trf".includes(char)) {
+        width += 0.45; // Caractères étroits
+      } else if ("mwMW".includes(char)) {
+        width += 0.85; // Caractères très larges
+      } else if ("ABCDEFGHKNOPQRSTUVXYZ".includes(char)) {
+        width += 0.65; // Majuscules moyennes-larges
+      } else if ("IL".includes(char)) {
+        width += 0.45; // Majuscules étroites
       } else {
-        width += 0.6; // Caractères standard
+        width += 0.55; // Caractères minuscules standard
       }
     }
-    return width * fontSize;
+    return width;
   };
 
-  const estimatedWidth = getEstimatedWidth(name, baseFontSize);
-  const targetWidth = maxWidthChars * baseFontSize * 0.6; // Facteur moyen
+  const estimatedWidthInEm = getEstimatedWidthInEm(name);
+  const estimatedWidthInRem = estimatedWidthInEm * baseFontSize;
 
-  if (estimatedWidth <= targetWidth) return baseFontSize;
+  if (estimatedWidthInRem <= maxWidthRem) return baseFontSize;
 
-  // Calculer le facteur de réduction nécessaire
-  const scaleFactor = targetWidth / estimatedWidth;
-  
+  // Calculer la taille de police nécessaire pour tenir dans maxWidthRem
+  const requiredFontSize = maxWidthRem / estimatedWidthInEm;
+
   // Appliquer une réduction minimale pour éviter les polices trop petites
-  const minScaleFactor = 0.4;
-  const finalScaleFactor = Math.max(scaleFactor, minScaleFactor);
-  
-  return baseFontSize * finalScaleFactor;
+  const minFontSize = baseFontSize * 0.5;
+
+  return Math.max(requiredFontSize, minFontSize);
 };
 
 interface CustomLayout {
@@ -842,7 +844,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                       fontSize: `${getAdaptiveFontSize(
                         team1.name,
                         scale < 1 ? 1.1 : 1.8,
-                        18
+                        12
                       )}rem`,
                       textAlign: "left",
                     }}
@@ -904,7 +906,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                       fontSize: `${getAdaptiveFontSize(
                         team2.name,
                         scale < 1 ? 1.1 : 1.8,
-                        18
+                        12
                       )}rem`,
                       textAlign: "left",
                     }}
@@ -996,11 +998,13 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                           ? "1.0rem"
                           : "1.5rem"
                         : `${getAdaptiveFontSize(
-                            `${upcomingMatches[0]?.player1.name || "Joueur 1"} vs ${
+                            `${
+                              upcomingMatches[0]?.player1.name || "Joueur 1"
+                            } vs ${
                               upcomingMatches[0]?.player2.name || "Joueur 2"
                             }`,
                             scale < 1 ? 1.0 : 1.5,
-                            45
+                            25
                           )}rem`,
                     mb: 0.3 * scale,
                     textAlign: "center",
@@ -1034,16 +1038,20 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                     color: theme.palette.primary.contrastText,
                     fontSize: upcomingMatches[1]
                       ? upcomingMatches[1].type === "double" ||
-                        upcomingMatches[1].player1?.name?.includes("Composition")
+                        upcomingMatches[1].player1?.name?.includes(
+                          "Composition"
+                        )
                         ? scale < 1
                           ? "1.0rem"
                           : "1.5rem"
                         : `${getAdaptiveFontSize(
-                            `${upcomingMatches[1]?.player1.name || "Joueur 1"} vs ${
+                            `${
+                              upcomingMatches[1]?.player1.name || "Joueur 1"
+                            } vs ${
                               upcomingMatches[1]?.player2.name || "Joueur 2"
                             }`,
                             scale < 1 ? 1.0 : 1.5,
-                            45
+                            25
                           )}rem`
                       : scale < 1
                       ? "1.0rem"
@@ -1131,7 +1139,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                         fontSize: `${getAdaptiveFontSize(
                           orderedMatch?.player1.name || "Joueur 1",
                           scale < 1 ? 1.1 : 1.8,
-                          28
+                          18
                         )}rem`,
                         textAlign: "left",
                       }}
@@ -1210,7 +1218,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                         fontSize: `${getAdaptiveFontSize(
                           orderedMatch?.player2.name || "Joueur 2",
                           scale < 1 ? 1.1 : 1.8,
-                          28
+                          18
                         )}rem`,
                         textAlign: "left",
                       }}

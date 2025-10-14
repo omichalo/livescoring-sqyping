@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Box, Typography } from "@mui/material";
-import { onSnapshot, collection, query, where } from "firebase/firestore";
+import { onSnapshot, collection, query, where, doc } from "firebase/firestore";
 import { db } from "../firebase";
 import type { Match, Team } from "../types";
 import { OverlayDesign } from "../components/OverlayDesign";
@@ -35,27 +35,50 @@ export const OverlayTVPage: React.FC = () => {
       setMatch(tableMatch || null);
     });
 
-    // Récupérer les équipes en temps réel
-    const teamsQuery = query(collection(db, "teams"));
-    const unsubscribeTeams = onSnapshot(
-      teamsQuery,
-      (snapshot) => {
-        const teamsData = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() } as Team))
-          .sort((a, b) => {
-            // Trier par le champ 'order', puis par nom si pas d'order défini
-            const orderA = a.order ?? 999;
-            const orderB = b.order ?? 999;
-            if (orderA !== orderB) {
+    // Récupérer en temps réel les équipes de la rencontre en cours
+    const unsubscribeTeam1 = onSnapshot(
+      doc(db, "teams", currentEncounter.team1Id),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const team1Data = { id: docSnap.id, ...docSnap.data() } as Team;
+          setTeams((prevTeams) => {
+            const team2 = prevTeams.find((t) => t.id === currentEncounter.team2Id);
+            const newTeams = team2 ? [team1Data, team2] : [team1Data];
+            // Trier par le champ 'order' pour garantir l'ordre correct
+            newTeams.sort((a, b) => {
+              const orderA = a.order ?? 999;
+              const orderB = b.order ?? 999;
               return orderA - orderB;
-            }
-            return a.name.localeCompare(b.name);
+            });
+            return newTeams;
           });
-        console.log("Équipes récupérées:", teamsData);
-        setTeams(teamsData);
+        }
       },
       (error) => {
-        console.error("Erreur lors de la récupération des équipes:", error);
+        console.error("Erreur lors de la récupération de l'équipe 1:", error);
+      }
+    );
+
+    const unsubscribeTeam2 = onSnapshot(
+      doc(db, "teams", currentEncounter.team2Id),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const team2Data = { id: docSnap.id, ...docSnap.data() } as Team;
+          setTeams((prevTeams) => {
+            const team1 = prevTeams.find((t) => t.id === currentEncounter.team1Id);
+            const newTeams = team1 ? [team1, team2Data] : [team2Data];
+            // Trier par le champ 'order' pour garantir l'ordre correct
+            newTeams.sort((a, b) => {
+              const orderA = a.order ?? 999;
+              const orderB = b.order ?? 999;
+              return orderA - orderB;
+            });
+            return newTeams;
+          });
+        }
+      },
+      (error) => {
+        console.error("Erreur lors de la récupération de l'équipe 2:", error);
       }
     );
 
@@ -96,7 +119,8 @@ export const OverlayTVPage: React.FC = () => {
     return () => {
       unsubscribe();
       unsubscribeUpcoming();
-      unsubscribeTeams();
+      unsubscribeTeam1();
+      unsubscribeTeam2();
     };
   }, [table, currentEncounter]);
 

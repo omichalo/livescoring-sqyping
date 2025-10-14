@@ -961,8 +961,17 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                     textAlign: "center",
                   }}
                 >
-                  {upcomingMatches[0]?.player1?.name?.includes("Composition")
-                    ? `Double ${upcomingMatches[0].matchNumber}`
+                  {upcomingMatches[0]?.type === "double" ||
+                  upcomingMatches[0]?.player1?.name?.includes("Composition")
+                    ? `Double ${
+                        upcomingMatches
+                          .slice(0, upcomingMatches.indexOf(upcomingMatches[0]) + 1)
+                          .filter(
+                            (m) =>
+                              m.type === "double" ||
+                              m.player1?.name?.includes("Composition")
+                          ).length
+                      }`
                     : `${truncateAtFirstLowercase(
                         upcomingMatches[0]?.player1.name || "Joueur 1",
                         15
@@ -982,8 +991,17 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                   }}
                 >
                   {upcomingMatches[1]
-                    ? upcomingMatches[1].player1?.name?.includes("Composition")
-                      ? `Double ${upcomingMatches[1].matchNumber}`
+                    ? upcomingMatches[1].type === "double" ||
+                      upcomingMatches[1].player1?.name?.includes("Composition")
+                      ? `Double ${
+                          upcomingMatches
+                            .slice(0, upcomingMatches.indexOf(upcomingMatches[1]) + 1)
+                            .filter(
+                              (m) =>
+                                m.type === "double" ||
+                                m.player1?.name?.includes("Composition")
+                            ).length
+                        }`
                       : `${truncateAtFirstLowercase(
                           upcomingMatches[1]?.player1.name || "Joueur 1",
                           15

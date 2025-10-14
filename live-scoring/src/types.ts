@@ -23,6 +23,7 @@ export interface Match {
   setsWon: { player1: number; player2: number };
   table?: number;
   matchNumber: number;
+  type?: "single" | "double"; // Type de match: simple ou double (optionnel pour rétrocompatibilité)
   status: "waiting" | "inProgress" | "finished" | "cancelled";
   startTime: number; // ⬅️ important
   encounterId?: string; // Référence à la rencontre

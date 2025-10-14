@@ -3,20 +3,17 @@ import { Box, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { Match, Team } from "../types";
 
-// Fonction pour tronquer un nom à partir de la première minuscule
-const truncateAtFirstLowercase = (name: string, maxLength: number): string => {
-  if (name.length <= maxLength) return name;
-
-  // Trouver la première minuscule
-  const firstLowercaseIndex = name.search(/[a-z]/);
-
-  if (firstLowercaseIndex === -1) {
-    // Pas de minuscule trouvée, tronquer normalement
-    return name.substring(0, maxLength);
-  }
-
-  // Tronquer à partir de la première minuscule
-  return name.substring(0, firstLowercaseIndex);
+// Fonction pour calculer la taille de police adaptative selon la longueur du nom
+const getAdaptiveFontSize = (
+  name: string,
+  baseFontSize: number,
+  maxLength: number
+): number => {
+  if (name.length <= maxLength) return baseFontSize;
+  
+  // Réduire la taille de police proportionnellement à la longueur excessive
+  const scaleFactor = maxLength / name.length;
+  return baseFontSize * scaleFactor;
 };
 
 interface CustomLayout {
@@ -814,11 +811,15 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                       color: theme.palette.primary.contrastText,
                       overflow: "hidden",
                       whiteSpace: "nowrap",
-                      fontSize: scale < 1 ? "1.1rem" : "1.8rem",
+                      fontSize: `${getAdaptiveFontSize(
+                        team1.name,
+                        scale < 1 ? 1.1 : 1.8,
+                        15
+                      )}rem`,
                       textAlign: "left",
                     }}
                   >
-                    {truncateAtFirstLowercase(team1.name, 15)}
+                    {team1.name}
                   </Typography>
                 </Box>
                 {/* Nombre de matchs */}
@@ -872,11 +873,15 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                       color: theme.palette.secondary.contrastText,
                       overflow: "hidden",
                       whiteSpace: "nowrap",
-                      fontSize: scale < 1 ? "1.1rem" : "1.8rem",
+                      fontSize: `${getAdaptiveFontSize(
+                        team2.name,
+                        scale < 1 ? 1.1 : 1.8,
+                        15
+                      )}rem`,
                       textAlign: "left",
                     }}
                   >
-                    {truncateAtFirstLowercase(team2.name, 15)}
+                    {team2.name}
                   </Typography>
                 </Box>
                 {/* Nombre de matchs */}
@@ -956,29 +961,42 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                   fontWeight={600}
                   sx={{
                     color: theme.palette.primary.contrastText,
-                    fontSize: scale < 1 ? "1.0rem" : "1.5rem",
+                    fontSize:
+                      upcomingMatches[0]?.type === "double" ||
+                      upcomingMatches[0]?.player1?.name?.includes("Composition")
+                        ? scale < 1
+                          ? "1.0rem"
+                          : "1.5rem"
+                        : `${getAdaptiveFontSize(
+                            `${upcomingMatches[0]?.player1.name || "Joueur 1"} vs ${
+                              upcomingMatches[0]?.player2.name || "Joueur 2"
+                            }`,
+                            scale < 1 ? 1.0 : 1.5,
+                            35
+                          )}rem`,
                     mb: 0.3 * scale,
                     textAlign: "center",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
                   }}
                 >
                   {upcomingMatches[0]?.type === "double" ||
                   upcomingMatches[0]?.player1?.name?.includes("Composition")
                     ? `Double ${
                         upcomingMatches
-                          .slice(0, upcomingMatches.indexOf(upcomingMatches[0]) + 1)
+                          .slice(
+                            0,
+                            upcomingMatches.indexOf(upcomingMatches[0]) + 1
+                          )
                           .filter(
                             (m) =>
                               m.type === "double" ||
                               m.player1?.name?.includes("Composition")
                           ).length
                       }`
-                    : `${truncateAtFirstLowercase(
-                        upcomingMatches[0]?.player1.name || "Joueur 1",
-                        15
-                      )} vs ${truncateAtFirstLowercase(
-                        upcomingMatches[0]?.player2.name || "Joueur 2",
-                        15
-                      )}`}
+                    : `${upcomingMatches[0]?.player1.name || "Joueur 1"} vs ${
+                        upcomingMatches[0]?.player2.name || "Joueur 2"
+                      }`}
                 </Typography>
                 {/* Ligne 3: Deuxième match */}
                 <Typography
@@ -986,8 +1004,25 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                   fontWeight={600}
                   sx={{
                     color: theme.palette.primary.contrastText,
-                    fontSize: scale < 1 ? "1.0rem" : "1.5rem",
+                    fontSize: upcomingMatches[1]
+                      ? upcomingMatches[1].type === "double" ||
+                        upcomingMatches[1].player1?.name?.includes("Composition")
+                        ? scale < 1
+                          ? "1.0rem"
+                          : "1.5rem"
+                        : `${getAdaptiveFontSize(
+                            `${upcomingMatches[1]?.player1.name || "Joueur 1"} vs ${
+                              upcomingMatches[1]?.player2.name || "Joueur 2"
+                            }`,
+                            scale < 1 ? 1.0 : 1.5,
+                            35
+                          )}rem`
+                      : scale < 1
+                      ? "1.0rem"
+                      : "1.5rem",
                     textAlign: "center",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
                   }}
                 >
                   {upcomingMatches[1]
@@ -995,20 +1030,19 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                       upcomingMatches[1].player1?.name?.includes("Composition")
                       ? `Double ${
                           upcomingMatches
-                            .slice(0, upcomingMatches.indexOf(upcomingMatches[1]) + 1)
+                            .slice(
+                              0,
+                              upcomingMatches.indexOf(upcomingMatches[1]) + 1
+                            )
                             .filter(
                               (m) =>
                                 m.type === "double" ||
                                 m.player1?.name?.includes("Composition")
                             ).length
                         }`
-                      : `${truncateAtFirstLowercase(
-                          upcomingMatches[1]?.player1.name || "Joueur 1",
-                          15
-                        )} vs ${truncateAtFirstLowercase(
-                          upcomingMatches[1]?.player2.name || "Joueur 2",
-                          15
-                        )}`
+                      : `${upcomingMatches[1]?.player1.name || "Joueur 1"} vs ${
+                          upcomingMatches[1]?.player2.name || "Joueur 2"
+                        }`
                     : "Aucun autre match"}
                 </Typography>
               </Box>
@@ -1058,7 +1092,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                   }}
                 >
                   {/* Nom du joueur */}
-                  <Box sx={{ width: "310px", minWidth: "310px" }}>
+                  <Box sx={{ flex: 1, minWidth: 0, px: 1 * scale }}>
                     <Typography
                       variant={scale < 1 ? "h6" : "h4"}
                       fontWeight={800}
@@ -1066,14 +1100,15 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                         color: theme.palette.primary.contrastText,
                         overflow: "hidden",
                         whiteSpace: "nowrap",
-                        fontSize: scale < 1 ? "1.1rem" : "1.8rem",
+                        fontSize: `${getAdaptiveFontSize(
+                          orderedMatch?.player1.name || "Joueur 1",
+                          scale < 1 ? 1.1 : 1.8,
+                          22
+                        )}rem`,
                         textAlign: "left",
                       }}
                     >
-                      {truncateAtFirstLowercase(
-                        orderedMatch?.player1.name || "Joueur 1",
-                        18
-                      )}
+                      {orderedMatch?.player1.name || "Joueur 1"}
                     </Typography>
                   </Box>
                   <Box
@@ -1136,7 +1171,7 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                   }}
                 >
                   {/* Nom du joueur */}
-                  <Box sx={{ width: "310px", minWidth: "310px" }}>
+                  <Box sx={{ flex: 1, minWidth: 0, px: 1 * scale }}>
                     <Typography
                       variant={scale < 1 ? "h6" : "h4"}
                       fontWeight={800}
@@ -1144,14 +1179,15 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                         color: theme.palette.secondary.contrastText,
                         overflow: "hidden",
                         whiteSpace: "nowrap",
-                        fontSize: scale < 1 ? "1.1rem" : "1.8rem",
+                        fontSize: `${getAdaptiveFontSize(
+                          orderedMatch?.player2.name || "Joueur 2",
+                          scale < 1 ? 1.1 : 1.8,
+                          22
+                        )}rem`,
                         textAlign: "left",
                       }}
                     >
-                      {truncateAtFirstLowercase(
-                        orderedMatch?.player2.name || "Joueur 2",
-                        18
-                      )}
+                      {orderedMatch?.player2.name || "Joueur 2"}
                     </Typography>
                   </Box>
                   <Box

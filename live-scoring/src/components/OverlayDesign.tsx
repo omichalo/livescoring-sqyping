@@ -961,8 +961,8 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                     textAlign: "center",
                   }}
                 >
-                  {upcomingMatches[0]?.matchNumber >= 13 && upcomingMatches[0]?.matchNumber <= 15
-                    ? `Double ${upcomingMatches[0].matchNumber - 12}`
+                  {upcomingMatches[0]?.player1?.name?.includes("Composition")
+                    ? `Double ${upcomingMatches[0].matchNumber}`
                     : `${truncateAtFirstLowercase(
                         upcomingMatches[0]?.player1.name || "Joueur 1",
                         15
@@ -982,8 +982,8 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                   }}
                 >
                   {upcomingMatches[1]
-                    ? upcomingMatches[1].matchNumber >= 13 && upcomingMatches[1].matchNumber <= 15
-                      ? `Double ${upcomingMatches[1].matchNumber - 12}`
+                    ? upcomingMatches[1].player1?.name?.includes("Composition")
+                      ? `Double ${upcomingMatches[1].matchNumber}`
                       : `${truncateAtFirstLowercase(
                           upcomingMatches[1]?.player1.name || "Joueur 1",
                           15

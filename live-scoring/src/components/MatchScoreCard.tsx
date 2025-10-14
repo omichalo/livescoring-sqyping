@@ -24,14 +24,20 @@ import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { EncounterService } from "../services/encounterService";
 
-function computeSetsWon(score: { player1: number; player2: number }[]): {
+function computeSetsWon(
+  score: { player1: number; player2: number }[],
+  includeCurrentSet = true
+): {
   player1: number;
   player2: number;
 } {
   const setsWon = { player1: 0, player2: 0 };
 
-  // Compter tous les sets, y compris le set en cours s'il est terminé
-  for (const { player1, player2 } of score) {
+  // Déterminer quels sets compter
+  const setsToCount = includeCurrentSet ? score : score.slice(0, -1); // Exclure le dernier set (en cours)
+
+  // Compter les sets terminés
+  for (const { player1, player2 } of setsToCount) {
     if (player1 >= 11 || player2 >= 11) {
       if (Math.abs(player1 - player2) >= 2) {
         if (player1 > player2) setsWon.player1++;
@@ -78,7 +84,10 @@ interface Props {
 
 export const MatchScoreCard: React.FC<Props> = ({ match }) => {
   const sets = match.score ?? [];
-  const setsWon = computeSetsWon(sets);
+  // Pour l'affichage : ne compter que les sets officiellement terminés (exclure le set en cours)
+  const setsWonDisplay = computeSetsWon(sets, false);
+  // Pour la logique de fin de match : inclure le set en cours s'il est terminé
+  const setsWonWithCurrent = computeSetsWon(sets, true);
 
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -87,8 +96,8 @@ export const MatchScoreCard: React.FC<Props> = ({ match }) => {
 
   const leftPlayerKey = flipped ? "player2" : "player1";
   const rightPlayerKey = flipped ? "player1" : "player2";
-  const setsWonLeft = setsWon[leftPlayerKey];
-  const setsWonRight = setsWon[rightPlayerKey];
+  const setsWonLeft = setsWonDisplay[leftPlayerKey];
+  const setsWonRight = setsWonDisplay[rightPlayerKey];
 
   const shouldFlipAtFiveInFifthSet = (
     isFifthSet: boolean,
@@ -161,7 +170,9 @@ export const MatchScoreCard: React.FC<Props> = ({ match }) => {
     // Si le match était terminé (status "finished"), retirer la victoire de l'équipe gagnante
     if (match.status === "finished") {
       const winnerTeamId =
-        setsWon.player1 === 3 ? match.player1.teamId : match.player2.teamId;
+        setsWonWithCurrent.player1 === 3
+          ? match.player1.teamId
+          : match.player2.teamId;
       await updateTeamVictories(winnerTeamId, -1);
     }
 
@@ -296,8 +307,9 @@ export const MatchScoreCard: React.FC<Props> = ({ match }) => {
     setSnackbarOpen(true);
   };
 
-  // Le match est terminé seulement si un joueur a officiellement 3 sets gagnés
-  const isFinished = setsWon.player1 === 3 || setsWon.player2 === 3;
+  // Le match peut être terminé si un joueur a 3 sets (en incluant le set en cours s'il est fini)
+  const isFinished =
+    setsWonWithCurrent.player1 === 3 || setsWonWithCurrent.player2 === 3;
 
   const canLaunchSet = (() => {
     // Si le match est déjà terminé (3 sets gagnés), ne pas permettre de lancer un nouveau set

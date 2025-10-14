@@ -961,15 +961,15 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                     textAlign: "center",
                   }}
                 >
-                  {truncateAtFirstLowercase(
-                    upcomingMatches[0]?.player1.name || "Joueur 1",
-                    15
-                  )}{" "}
-                  vs{" "}
-                  {truncateAtFirstLowercase(
-                    upcomingMatches[0]?.player2.name || "Joueur 2",
-                    15
-                  )}
+                  {upcomingMatches[0]?.matchNumber >= 13 && upcomingMatches[0]?.matchNumber <= 15
+                    ? `Double ${upcomingMatches[0].matchNumber - 12}`
+                    : `${truncateAtFirstLowercase(
+                        upcomingMatches[0]?.player1.name || "Joueur 1",
+                        15
+                      )} vs ${truncateAtFirstLowercase(
+                        upcomingMatches[0]?.player2.name || "Joueur 2",
+                        15
+                      )}`}
                 </Typography>
                 {/* Ligne 3: Deuxième match */}
                 <Typography
@@ -982,13 +982,15 @@ export const OverlayDesign: React.FC<OverlayDesignProps> = ({
                   }}
                 >
                   {upcomingMatches[1]
-                    ? `${truncateAtFirstLowercase(
-                        upcomingMatches[1]?.player1.name || "Joueur 1",
-                        15
-                      )} vs ${truncateAtFirstLowercase(
-                        upcomingMatches[1]?.player2.name || "Joueur 2",
-                        15
-                      )}`
+                    ? upcomingMatches[1].matchNumber >= 13 && upcomingMatches[1].matchNumber <= 15
+                      ? `Double ${upcomingMatches[1].matchNumber - 12}`
+                      : `${truncateAtFirstLowercase(
+                          upcomingMatches[1]?.player1.name || "Joueur 1",
+                          15
+                        )} vs ${truncateAtFirstLowercase(
+                          upcomingMatches[1]?.player2.name || "Joueur 2",
+                          15
+                        )}`
                     : "Aucun autre match"}
                 </Typography>
               </Box>

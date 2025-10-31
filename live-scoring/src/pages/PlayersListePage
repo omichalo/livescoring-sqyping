@@ -1,0 +1,120 @@
+import { useEffect, useState } from "react";
+import {
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
+import { Link } from "react-router-dom";
+import type { Team } from "../types";
+
+export const PlayersListPage = () => {
+  interface Player {
+    id: string;
+    name: string;
+    teamId?: string;
+  }
+
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+
+  useEffect(() => {
+    // Récupérer les équipes en temps réel
+    const unsubscribeTeams = onSnapshot(collection(db, "teams"), (snapshot) => {
+      const teamsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Team[];
+      setTeams(teamsData);
+    });
+
+    // Récupérer tous les joueurs en temps réel
+    const unsubscribePlayers = onSnapshot(
+      collection(db, "players"),
+      (snapshot) => {
+        const list: Player[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || "Inconnu",
+            teamId: data.team,
+          };
+        });
+        setPlayers(list);
+      }
+    );
+
+    return () => {
+      unsubscribeTeams();
+      unsubscribePlayers();
+    };
+  }, []);
+
+  const team1Players = players.filter((p) => p.teamId === teams[0]?.id);
+  const team2Players = players.filter((p) => p.teamId === teams[1]?.id);
+
+  return (
+    <Paper sx={{ p: 4, maxWidth: 600, mx: "auto", mt: 4 }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={2}
+      >
+        <Typography variant="h5">Liste des joueurs</Typography>
+        <Button component={Link} to="/players/new" variant="contained">
+          ➕ Ajouter un joueur
+        </Button>
+      </Stack>
+
+      <Typography variant="h6" mt={2}>
+        {teams[0]?.name || "Équipe 1"}
+      </Typography>
+      <List>
+        {team1Players.map((player) => (
+          <ListItem
+            key={player.id}
+            secondaryAction={
+              <Button
+                component={Link}
+                to={`/players/${player.id}`}
+                variant="outlined"
+              >
+                Modifier
+              </Button>
+            }
+          >
+            <ListItemText primary={player.name} />
+          </ListItem>
+        ))}
+      </List>
+
+      <Typography variant="h6" mt={4}>
+        {teams[1]?.name || "Équipe 2"}
+      </Typography>
+      <List>
+        {team2Players.map((player) => (
+          <ListItem
+            key={player.id}
+            secondaryAction={
+              <Button
+                component={Link}
+                to={`/players/${player.id}`}
+                variant="outlined"
+              >
+                Modifier
+              </Button>
+            }
+          >
+            <ListItemText primary={player.name} />
+          </ListItem>
+        ))}
+      </List>
+    </Paper>
+  );
+};

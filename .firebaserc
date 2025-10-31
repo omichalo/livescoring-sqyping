@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "sqyping-live-scoring"
-  }
+  },
+  "targets": {
+    "sqyping-live-scoring": {
+      "hosting": {
+        "livescoring-sqyping": [
+          "livescoring-sqyping"
+        ],
+        "live-scoring-sqyparatt": [
+          "live-scoring-sqyparatt"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

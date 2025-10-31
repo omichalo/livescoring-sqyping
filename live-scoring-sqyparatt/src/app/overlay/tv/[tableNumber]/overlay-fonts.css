@@ -1,0 +1,37 @@
+@font-face {
+  font-family: 'Righteous';
+  src: url('/fonts/Righteous-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Urbanist';
+  src: url('/fonts/Urbanist-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.overlay-font {
+  font-family: 'Righteous', sans-serif;
+  font-size: 12px !important;
+  font-weight: bold !important;
+}
+
+.overlay-font * {
+  font-size: 12px !important;
+  font-weight: bold !important;
+}
+
+.overlay-font .next-match-text {
+  font-size: 10px !important;
+  font-weight: bold !important;
+}
+
+.overlay-font .match-description {
+  font-family: 'Urbanist', sans-serif !important;
+  font-size: 10px !important;
+  font-weight: normal !important;
+}

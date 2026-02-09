@@ -116,5 +116,3 @@ export function TableSelector({
     </div>
   );
 }
-
-

@@ -20,9 +20,9 @@ import {
 } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, Paper } from "@mui/material";
 import { DragIndicator } from "@mui/icons-material";
-import type { ChampionshipId } from "@/lib/ittf/types";
+import type { ChampionshipId, LiveScoringMatch } from "@/lib/ittf/types";
 import { TableBlock } from "./TableBlock";
 import { loadTableOrder, saveTableOrder } from "@/lib/localStorage";
 
@@ -77,8 +77,6 @@ function SortableTableItem({
         sx={{
           position: "relative",
           height: "100%",
-          minHeight: "650px",
-          width: "100%", // S'assurer que l'élément occupe toute la largeur
           transition: "all 0.2s ease-in-out",
           "&:hover": {
             boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
@@ -104,21 +102,16 @@ function SortableTableItem({
             right: 8,
             zIndex: 10,
             cursor: "grab",
-            opacity: 0.8,
-            backgroundColor: "rgba(255, 255, 255, 0.95)",
-            borderRadius: "6px",
-            padding: "8px", // Zone tactile plus grande
-            minWidth: "44px", // Taille minimale recommandée pour les touches tactiles
-            minHeight: "44px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            opacity: 0.7,
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            borderRadius: "4px",
+            padding: "4px",
             transition: "all 0.2s ease-in-out",
             transform: "scale(1)",
             "&:hover": {
               opacity: 1,
               backgroundColor: "rgba(255, 255, 255, 1)",
-              transform: "scale(1.05)",
+              transform: "scale(1.1)",
               boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
             },
             "&:active": {
@@ -151,18 +144,8 @@ export function DraggableTableGrid({
   const [tableOrder, setTableOrder] = useState<TableItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Toujours utiliser verticalListSortingStrategy pour plus de fiabilité
-  // rectSortingStrategy peut causer des problèmes sur les tablettes
-  const sortingStrategy = verticalListSortingStrategy;
-
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5, // Distance réduite pour les tablettes
-        delay: 100, // Délai pour éviter les conflits avec le scroll
-        tolerance: 5, // Tolérance pour les mouvements involontaires
-      },
-    }),
+    useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -252,7 +235,7 @@ export function DraggableTableGrid({
     >
       <SortableContext
         items={tableOrder.map((item) => item.id)}
-        strategy={sortingStrategy}
+        strategy={verticalListSortingStrategy}
       >
         <Box
           sx={{
@@ -260,16 +243,11 @@ export function DraggableTableGrid({
             gridTemplateColumns: {
               xs: "1fr",
               sm: "1fr",
-              md: "1fr",
-              lg: "repeat(2, 1fr)",
+              md: "repeat(2, 1fr)",
             },
             gap: 2,
-            minHeight: "650px",
+            minHeight: "200px",
             transition: "all 0.3s ease",
-            // S'assurer que chaque élément a une taille définie
-            gridAutoRows: "minmax(650px, auto)",
-            // Améliorer la zone de drop
-            padding: "4px",
           }}
         >
           {tableOrder.map((item) => (

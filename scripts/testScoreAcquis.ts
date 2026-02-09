@@ -61,7 +61,6 @@ async function setupTestScoreAcquis() {
       numberOfTables: 2,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      isCurrent: true,
     };
 
     await setDoc(doc(db, "encounters", encounterId), encounterData);

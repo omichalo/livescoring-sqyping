@@ -145,9 +145,6 @@ export interface Match {
   /** Description du match depuis l'API ITTF */
   Desc?: string;
 
-  /** Indique si le match a des compositions détaillées (joueurs connus) */
-  hasComps?: boolean;
-
   /** Équipe/Joueur 1 */
   team1: Team;
 
@@ -179,9 +176,6 @@ export interface Team {
 
   /** Numéro de seed si applicable */
   seed?: number;
-
-  /** Membres individuels en cas de match en double */
-  members?: Array<{ name: string; country: string }>;
 }
 
 // ============================================================================
@@ -427,6 +421,4 @@ export interface LiveScoringMatch extends Match {
   firestoreId?: string;
   /** Description du match depuis Firestore */
   matchDesc?: string;
-  /** Statut Firestore du match ("waiting" | "inProgress" | "finished" | "cancelled") */
-  firestoreStatus?: "waiting" | "inProgress" | "finished" | "cancelled";
 }

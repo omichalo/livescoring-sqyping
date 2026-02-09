@@ -19,14 +19,10 @@ import {
   DialogActions,
   Snackbar,
   Box,
-  Tooltip,
 } from "@mui/material";
-import { Flag } from "@mui/icons-material";
 import type { Match } from "@/types/livescoring";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { milestoneService } from "@/services/milestoneService";
-import { useCurrentEncounter } from "@/hooks/useCurrentEncounter";
 
 function computeSetsWon(
   score: { player1: number; player2: number }[],
@@ -64,19 +60,10 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
   // Pour la logique de fin de match : inclure le set en cours s'il est terminé
   const setsWonWithCurrent = computeSetsWon(sets, true);
 
-  // Fonction pour construire l'URL du drapeau
-  const getFlagUrl = (countryCode: string) => {
-    if (!countryCode) return "/placeholder-flag.svg";
-    return `https://results.ittf.com/ittf-web-results/img/flags-v2/${countryCode}.png`;
-  };
-
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [flipped, setFlipped] = useState(false);
-  const [isAddingMilestone, setIsAddingMilestone] = useState(false);
-
-  const { currentEncounter } = useCurrentEncounter();
 
   const leftPlayerKey = flipped ? "player2" : "player1";
   const rightPlayerKey = flipped ? "player1" : "player2";
@@ -123,8 +110,7 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     updated[currentSetIndex] = currentSet;
 
     // Calculer les sets gagnés avec le nouveau score
-    // Ne PAS inclure le set en cours tant qu'il n'est pas officiellement terminé
-    const updatedSetsWon = computeSetsWon(updated, false); // false = exclure le set en cours
+    const updatedSetsWon = computeSetsWon(updated);
     const isFinished =
       updatedSetsWon.player1 === 3 || updatedSetsWon.player2 === 3;
 
@@ -174,14 +160,9 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
       const updatePayload: Partial<Match> = {
         score: [{ player1: 0, player2: 0 }],
         status: "inProgress",
-        startTime: Date.now(), // Définir startTime au moment du clic sur "Lancer"
       };
 
       await updateDoc(doc(db, "matches", match.id), updatePayload);
-      console.log(
-        "🚀 Match lancé avec startTime:",
-        new Date(updatePayload.startTime!).toISOString()
-      );
     }
   };
 
@@ -194,16 +175,15 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     const alreadyEmptySet = last && last.player1 === 0 && last.player2 === 0;
     if (!finished || alreadyEmptySet) return;
 
-    // Calculer les sets gagnés AVANT d'ajouter le nouveau set vide
-    // On inclut le set qui vient de se terminer dans le calcul
-    const updatedSetsWon = computeSetsWon(sets, true); // true = inclure le set en cours
-
     // Valider officiellement le set précédent en l'ajoutant aux sets terminés
     const updated = [...sets, { player1: 0, player2: 0 }];
 
+    // Calcul des sets gagnés sur tous les sets SAUF le dernier (vide)
+    const updatedSetsWon = computeSetsWon(updated);
+
     const updatePayload: Partial<Match> = {
       score: updated,
-      setsWon: updatedSetsWon, // Sets officiellement gagnés (incluant le set qui vient de se terminer)
+      setsWon: updatedSetsWon, // Sets officiellement gagnés
     };
 
     // Règle du tennis de table : changement automatique de côté au début de chaque nouvelle manche
@@ -217,18 +197,14 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
       );
     }
 
-    console.log(`✅ Set ${sets.length} officiellement terminé et validé`, {
-      previousSetsWon: computeSetsWon(sets, false),
-      newSetsWon: updatedSetsWon,
-    });
+    console.log(`✅ Set ${sets.length} officiellement terminé et validé`);
 
     await updateDoc(doc(db, "matches", match.id), updatePayload);
   };
 
   const terminateMatch = async () => {
     // Vérifier si le match peut être terminé (un joueur a 3 sets)
-    // On inclut le set en cours dans le calcul pour la vérification
-    const currentSetsWon = computeSetsWon(sets, true); // true = inclure le set en cours
+    const currentSetsWon = computeSetsWon(sets);
     const canTerminate =
       currentSetsWon.player1 === 3 || currentSetsWon.player2 === 3;
 
@@ -240,7 +216,7 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     }
 
     // Calculer les sets gagnés en incluant le set en cours
-    const updatedSetsWon = computeSetsWon(sets, true); // true = inclure le set en cours
+    const updatedSetsWon = computeSetsWon(sets);
 
     // Déterminer le gagnant basé sur les sets gagnés
     const isPlayer1Winner = updatedSetsWon.player1 === 3;
@@ -276,127 +252,6 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     }, 2000); // 2 secondes pour voir la notification
   };
 
-  // Fonction pour ajouter un point marquant
-  const handleAddMilestone = async () => {
-    if (!currentEncounter) {
-      console.error("Aucun encounter actif");
-      return;
-    }
-
-    setIsAddingMilestone(true);
-    try {
-      const now = Date.now();
-
-      // Debug: afficher les valeurs pour comprendre le problème
-      console.log("Debug temps:", {
-        now: new Date(now).toISOString(),
-        matchStartTime: match.startTime
-          ? new Date(match.startTime).toISOString()
-          : "undefined",
-        matchStartTimeRaw: match.startTime,
-        difference: match.startTime ? now - match.startTime : "N/A",
-      });
-
-      // Utiliser startTime si disponible et valide, sinon utiliser un timestamp par défaut
-      let matchStartTime;
-      const currentYear = new Date().getFullYear();
-      const startTimeYear = match.startTime
-        ? new Date(match.startTime).getFullYear()
-        : 0;
-
-      if (
-        match.startTime &&
-        match.startTime > 0 &&
-        startTimeYear === currentYear &&
-        match.startTime < now
-      ) {
-        matchStartTime = match.startTime;
-      } else {
-        // Si startTime n'est pas valide (futur ou année incorrecte), utiliser un timestamp par défaut
-        // Calculer un timestamp réaliste pour aujourd'hui (il y a 5 minutes)
-        const realisticNow = new Date().getTime();
-        matchStartTime = realisticNow - 300000; // 5 minutes en arrière par défaut
-        console.log(
-          "startTime invalide (futur ou année incorrecte), utilisation du fallback:",
-          {
-            originalStartTime: match.startTime
-              ? new Date(match.startTime).toISOString()
-              : "undefined",
-            startTimeYear,
-            currentYear,
-            fallbackTime: new Date(matchStartTime).toISOString(),
-          }
-        );
-      }
-
-      const timeSinceStart = Math.max(
-        0,
-        Math.floor((now - matchStartTime) / 1000)
-      ); // en secondes, minimum 0
-
-      console.log("Calcul détaillé du temps:", {
-        now,
-        matchStartTime,
-        differenceMs: now - matchStartTime,
-        differenceSeconds: (now - matchStartTime) / 1000,
-        timeSinceStart,
-        minutes: Math.floor(timeSinceStart / 60),
-        seconds: timeSinceStart % 60,
-        hours: Math.floor(timeSinceStart / 3600),
-      });
-
-      console.log("Temps calculé:", {
-        timeSinceStart,
-        minutes: Math.floor(timeSinceStart / 60),
-        seconds: timeSinceStart % 60,
-      });
-
-      // Calculer le score actuel
-      const currentScore = match.score?.[match.score.length - 1] || {
-        player1: 0,
-        player2: 0,
-      };
-      const setsWon = match.setsWon || { player1: 0, player2: 0 };
-
-      const matchInfo = {
-        matchId: match.id,
-        player1Name: match.player1?.name || "Joueur 1",
-        player2Name: match.player2?.name || "Joueur 2",
-        player1Country: match.player1?.teamId || "",
-        player2Country: match.player2?.teamId || "",
-        matchStartTime,
-        timeSinceStart,
-        currentScore,
-        setsWon,
-        matchStatus: match.status as
-          | "waiting"
-          | "inProgress"
-          | "finished"
-          | "cancelled",
-        matchDesc: match.matchDesc || "",
-      };
-
-      await milestoneService.addMilestoneWithMatchInfo(
-        match.table || 1, // Fallback à la table 1 si undefined
-        currentEncounter.id,
-        matchInfo
-      );
-      console.log(`Point marquant ajouté avec infos du match:`, matchInfo);
-
-      // Afficher une notification de succès
-      setSnackbarMessage(
-        `✅ Point marquant ajouté pour la table ${match.table}`
-      );
-      setSnackbarOpen(true);
-    } catch (error) {
-      console.error("Erreur lors de l'ajout du point marquant:", error);
-      setSnackbarMessage("❌ Erreur lors de l'ajout du point marquant");
-      setSnackbarOpen(true);
-    } finally {
-      setIsAddingMilestone(false);
-    }
-  };
-
   // Le match peut être terminé si un joueur a 3 sets (en incluant le set en cours s'il est fini)
   const isFinished =
     setsWonWithCurrent.player1 === 3 || setsWonWithCurrent.player2 === 3;
@@ -419,22 +274,35 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
 
   return (
     <>
-      {/* <Paper
+      <Paper
         sx={{
-          px: 2,
-          mb: 0,
+          p: 3,
+          mb: 3,
           borderRadius: 2,
           boxShadow: 2,
           bgcolor: "background.paper",
-          height: "100%",
-          // minHeight: "550px",
-          display: "flex",
-          flexDirection: "column",
         }}
-      > */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <Box sx={{ mb: 1, maxHeight: "200px", overflow: "hidden" }}>
-          <Table size="small">
+      >
+        {/* Bouton de fermeture */}
+        {onClose && (
+          <Box display="flex" justifyContent="flex-end" mb={2}>
+            <Button
+              variant="outlined"
+              onClick={onClose}
+              size="small"
+              sx={{ minWidth: "auto", px: 2 }}
+            >
+              ✕ Fermer
+            </Button>
+          </Box>
+        )}
+
+        <Typography variant="h5" align="center" fontWeight={600} gutterBottom>
+          🏓 Table {match.table}
+        </Typography>
+
+        <Box mt={2}>
+          <Table>
             <TableHead>
               <TableRow>
                 <TableCell>Joueur</TableCell>
@@ -455,12 +323,6 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
                         bgcolor:
                           idx === 0 ? "primary.light" : "secondary.light",
                         minWidth: 200,
-                        maxWidth: 200,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
                       }}
                     >
                       {player.name}
@@ -496,256 +358,167 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
             </TableBody>
           </Table>
         </Box>
-      </Box>
 
-      {/* Contrôles de scoring */}
-      <Box display="flex" justifyContent="center">
-        <Box display="flex" gap={3} alignItems="center">
-          <Stack spacing={1} alignItems="center" sx={{ maxWidth: 200 }}>
-            <Box
-              component="img"
-              src={getFlagUrl(leftPlayer.teamId)}
-              alt={`Drapeau ${leftPlayer.teamId}`}
-              sx={{
-                width: 32,
-                height: 20,
-                borderRadius: 0.5,
-                objectFit: "contain",
-                imageRendering: "high-quality",
-              }}
-              onError={(e) => {
-                e.currentTarget.src = "/placeholder-flag.svg";
-              }}
-            />
-            <Typography
-              variant="subtitle1"
-              fontWeight={600}
-              fontSize={16}
-              color="text.secondary"
-              sx={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                width: "100%",
-                textAlign: "center",
-              }}
-            >
-              {leftPlayer.name}
-            </Typography>
-            <IconButton
-              onClick={() => updateScore(leftPlayerKey, 1)}
-              disabled={isFinished || sets.length == 0 || canLaunchSet}
-              sx={{
-                width: 64,
-                height: 64,
-                bgcolor: "success.light",
-                "&:hover": { bgcolor: "success.main" },
-                "&.Mui-disabled": {
-                  bgcolor: "success.light", // garde le fond vert clair
-                  color: "white", // garde la couleur du texte
-                  opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
-                },
-              }}
-            >
-              <Typography variant="h4" color="white">
-                +
+        <Box mt={4} display="flex" justifyContent="center">
+          <Box display="flex" gap={3} alignItems="center">
+            <Stack spacing={1} alignItems="center">
+              <Typography
+                variant="subtitle1"
+                fontWeight={600}
+                fontSize={16}
+                color="text.secondary"
+              >
+                {leftPlayer.name}
               </Typography>
-            </IconButton>
-            <IconButton
-              onClick={() => updateScore(leftPlayerKey, -1)}
-              disabled={isFinished || sets.length == 0 || canLaunchSet}
-              sx={{
-                bgcolor: "#f8bbd0",
-                "&:hover": { bgcolor: "#f48fb1" },
-                "&.Mui-disabled": {
-                  bgcolor: "#f8bbd0", // garde le fond rouge clair
-                  color: "white", // garde la couleur du texte
-                  opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
-                },
-              }}
-            >
-              <Typography variant="h6">−</Typography>
-            </IconButton>
-          </Stack>
+              <IconButton
+                onClick={() => updateScore(leftPlayerKey, 1)}
+                disabled={isFinished || sets.length == 0 || canLaunchSet}
+                sx={{
+                  width: 64,
+                  height: 64,
+                  bgcolor: "success.light",
+                  "&:hover": { bgcolor: "success.main" },
+                  "&.Mui-disabled": {
+                    bgcolor: "success.light", // garde le fond vert clair
+                    color: "white", // garde la couleur du texte
+                    opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
+                  },
+                }}
+              >
+                <Typography variant="h4" color="white">
+                  +
+                </Typography>
+              </IconButton>
+              <IconButton
+                onClick={() => updateScore(leftPlayerKey, -1)}
+                disabled={isFinished || sets.length == 0 || canLaunchSet}
+                sx={{
+                  bgcolor: "#f8bbd0",
+                  "&:hover": { bgcolor: "#f48fb1" },
+                  "&.Mui-disabled": {
+                    bgcolor: "#f8bbd0", // garde le fond rouge clair
+                    color: "white", // garde la couleur du texte
+                    opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
+                  },
+                }}
+              >
+                <Typography variant="h6">−</Typography>
+              </IconButton>
+            </Stack>
 
-          <Box display="flex" flexDirection="column" alignItems="center">
-            <Box display="flex" gap={4} mb={1}>
-              <Box bgcolor="primary.light" px={2} py={0.5} borderRadius={1}>
-                <Typography variant="h6">{setsWonLeft}</Typography>
+            <Box display="flex" flexDirection="column" alignItems="center">
+              <Box display="flex" gap={4} mb={1}>
+                <Box bgcolor="primary.light" px={2} py={0.5} borderRadius={1}>
+                  <Typography variant="h6">{setsWonLeft}</Typography>
+                </Box>
+                <Box bgcolor="secondary.light" px={2} py={0.5} borderRadius={1}>
+                  <Typography variant="h6">{setsWonRight}</Typography>
+                </Box>
               </Box>
-              <Box bgcolor="secondary.light" px={2} py={0.5} borderRadius={1}>
-                <Typography variant="h6">{setsWonRight}</Typography>
+              <Box
+                display="flex"
+                gap={4}
+                bgcolor="#fff59d"
+                px={4}
+                py={1.5}
+                borderRadius={2}
+              >
+                <Typography variant="h4">
+                  {sets[sets.length - 1]?.[leftPlayerKey] ?? 0}
+                </Typography>
+                <Typography variant="h4">
+                  {sets[sets.length - 1]?.[rightPlayerKey] ?? 0}
+                </Typography>
               </Box>
             </Box>
-            <Box
-              display="flex"
-              gap={4}
-              bgcolor="#fff59d"
-              px={4}
-              py={1.5}
-              borderRadius={2}
-            >
-              <Typography variant="h4">
-                {sets[sets.length - 1]?.[leftPlayerKey] ?? 0}
+
+            <Stack spacing={1} alignItems="center">
+              <Typography
+                variant="subtitle1"
+                fontWeight={600}
+                fontSize={16}
+                color="text.secondary"
+              >
+                {rightPlayer.name}
               </Typography>
-              <Typography variant="h4">
-                {sets[sets.length - 1]?.[rightPlayerKey] ?? 0}
-              </Typography>
-            </Box>
+              <IconButton
+                onClick={() => updateScore(rightPlayerKey, 1)}
+                disabled={isFinished || sets.length == 0 || canLaunchSet}
+                sx={{
+                  width: 64,
+                  height: 64,
+                  bgcolor: "success.light",
+                  "&:hover": { bgcolor: "success.main" },
+                  "&.Mui-disabled": {
+                    bgcolor: "success.light", // garde le fond vert clair
+                    color: "white", // garde la couleur du texte
+                    opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
+                  },
+                }}
+              >
+                <Typography variant="h4" color="white">
+                  +
+                </Typography>
+              </IconButton>
+              <IconButton
+                onClick={() => updateScore(rightPlayerKey, -1)}
+                disabled={isFinished || sets.length == 0 || canLaunchSet}
+                sx={{
+                  bgcolor: "#f8bbd0",
+                  "&:hover": { bgcolor: "#f48fb1" },
+                  "&.Mui-disabled": {
+                    bgcolor: "#f8bbd0", // garde le fond rouge clair
+                    color: "white", // garde la couleur du texte
+                    opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
+                  },
+                }}
+              >
+                <Typography variant="h6">−</Typography>
+              </IconButton>
+            </Stack>
           </Box>
-
-          <Stack spacing={1} alignItems="center" sx={{ maxWidth: 200 }}>
-            <Box
-              component="img"
-              src={getFlagUrl(rightPlayer.teamId)}
-              alt={`Drapeau ${rightPlayer.teamId}`}
-              sx={{
-                width: 32,
-                height: 20,
-                borderRadius: 0.5,
-                objectFit: "contain",
-                imageRendering: "high-quality",
-              }}
-              onError={(e) => {
-                e.currentTarget.src = "/placeholder-flag.svg";
-              }}
-            />
-            <Typography
-              variant="subtitle1"
-              fontWeight={600}
-              fontSize={16}
-              color="text.secondary"
-              sx={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                width: "100%",
-                textAlign: "center",
-              }}
-            >
-              {rightPlayer.name}
-            </Typography>
-            <IconButton
-              onClick={() => updateScore(rightPlayerKey, 1)}
-              disabled={isFinished || sets.length == 0 || canLaunchSet}
-              sx={{
-                width: 64,
-                height: 64,
-                bgcolor: "success.light",
-                "&:hover": { bgcolor: "success.main" },
-                "&.Mui-disabled": {
-                  bgcolor: "success.light", // garde le fond vert clair
-                  color: "white", // garde la couleur du texte
-                  opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
-                },
-              }}
-            >
-              <Typography variant="h4" color="white">
-                +
-              </Typography>
-            </IconButton>
-            <IconButton
-              onClick={() => updateScore(rightPlayerKey, -1)}
-              disabled={isFinished || sets.length == 0 || canLaunchSet}
-              sx={{
-                bgcolor: "#f8bbd0",
-                "&:hover": { bgcolor: "#f48fb1" },
-                "&.Mui-disabled": {
-                  bgcolor: "#f8bbd0", // garde le fond rouge clair
-                  color: "white", // garde la couleur du texte
-                  opacity: 0.6, // optionnel : donne un effet visuel "désactivé" sans devenir blanc
-                },
-              }}
-            >
-              <Typography variant="h6">−</Typography>
-            </IconButton>
-          </Stack>
         </Box>
-      </Box>
 
-      {/* Boutons d'action */}
-      <Box sx={{ mt: 3 }}>
-        <Stack direction="row" spacing={2} justifyContent="center">
-          {!isFinished && (
-            <Button
-              variant="outlined"
-              onClick={changeSides}
-              title="Changer manuellement les côtés des joueurs"
-            >
-              ↔ Changer côtés
-            </Button>
-          )}
-          {sets.length === 0 && (
-            <Button
-              variant="outlined"
-              onClick={launchMatch}
-              title="Initialiser le premier set"
-            >
-              ▶ Lancer
-            </Button>
-          )}
-          {canLaunchSet && !isFinished && (
-            <Button
-              variant="outlined"
-              onClick={launchSet}
-              title="Commencer un nouveau set"
-            >
-              ⏱ Lancer Set
-            </Button>
-          )}
-          {currentEncounter &&
-            !isFinished &&
-            sets.length > 0 &&
-            !canLaunchSet && (
-              <Tooltip title="Ajouter un point marquant avec les infos du match">
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  onClick={handleAddMilestone}
-                  disabled={isAddingMilestone}
-                  title="Ajouter un point marquant avec les infos du match"
-                  sx={{
-                    flexDirection: "column",
-                    minWidth: "120px",
-                    height: "60px",
-                    py: 1,
-                    px: 2,
-                  }}
-                >
-                  <Flag sx={{ mb: 0.5, fontSize: "1.2rem" }} />
-                  <span style={{ fontSize: "0.75rem" }}>
-                    {isAddingMilestone ? "Ajout..." : "Point marquant"}
-                  </span>
-                </Button>
-              </Tooltip>
-            )}
-          {isFinished && (
-            <Button
-              variant="contained"
-              color="success"
-              onClick={terminateMatch}
-              title="Terminer le match et revenir à la liste"
-            >
-              🏆 Terminer & Retour
-            </Button>
-          )}
-          {onClose && (
-            <Button
-              variant="outlined"
-              onClick={onClose}
-              size="small"
-              sx={{ minWidth: "auto", px: 1.5 }}
-            >
-              ✕
-            </Button>
-          )}
+        <Stack direction="row" spacing={2} justifyContent="center" mt={3}>
+          <Button
+            variant="outlined"
+            onClick={changeSides}
+            disabled={isFinished}
+            title="Changer manuellement les côtés des joueurs (désactivé si le match est terminé)"
+            sx={{ opacity: isFinished ? 0.4 : 1 }}
+          >
+            ↔ Changer côtés
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={launchMatch}
+            disabled={sets.length > 0}
+            title="Initialiser le premier set (actif uniquement au début du match)"
+            sx={{ opacity: sets.length > 0 ? 0.4 : 1 }}
+          >
+            ▶ Lancer
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={launchSet}
+            disabled={!canLaunchSet || isFinished}
+            title="Commencer un nouveau set (si le précédent est terminé)"
+            sx={{ opacity: !canLaunchSet || isFinished ? 0.4 : 1 }}
+          >
+            ⏱ Lancer Set
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={terminateMatch}
+            disabled={!isFinished}
+            title="Terminer le match et revenir à la liste (uniquement si un joueur a gagné 3 sets)"
+            sx={{ opacity: !isFinished ? 0.4 : 1 }}
+          >
+            🏆 Terminer & Retour
+          </Button>
         </Stack>
-      </Box>
-      {/* </Paper> */}
+      </Paper>
 
       <Dialog
         open={confirmResetOpen}

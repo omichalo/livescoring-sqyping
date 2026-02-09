@@ -5,11 +5,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  getITTFIframeUrl,
-  buildITTFUrl,
-  getIframeHeight,
-} from "@/lib/firebase-remote-config";
+import { getFFTTIframeUrl, buildFFTTUrl } from "@/lib/firebase-remote-config";
 
 interface FFTTIframeProps {
   tableNumber: number;
@@ -18,38 +14,26 @@ interface FFTTIframeProps {
 
 export function FFTTIframe({ tableNumber, className = "" }: FFTTIframeProps) {
   const [iframeUrl, setIframeUrl] = useState<string>("");
-  const [iframeHeight, setIframeHeight] = useState<string>("450px");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadConfig() {
+    async function loadUrl() {
       try {
         setIsLoading(true);
         setError(null);
-
-        // Charger l'URL et la hauteur en parallèle
-        const [baseUrl, height] = await Promise.all([
-          getITTFIframeUrl(),
-          getIframeHeight(),
-        ]);
-
-        const url = buildITTFUrl(baseUrl, tableNumber);
+        const baseUrl = await getFFTTIframeUrl();
+        const url = buildFFTTUrl(baseUrl, tableNumber);
         setIframeUrl(url);
-        setIframeHeight(height);
-        console.log("📏 Configuration iframe chargée:", { url, height });
       } catch (err) {
-        console.error(
-          "Erreur lors du chargement de la configuration FFTT:",
-          err
-        );
+        console.error("Erreur lors du chargement de l'URL FFTT:", err);
         setError("Impossible de charger l'iframe FFTT");
       } finally {
         setIsLoading(false);
       }
     }
 
-    loadConfig();
+    loadUrl();
   }, [tableNumber]);
 
   if (isLoading) {
@@ -92,15 +76,13 @@ export function FFTTIframe({ tableNumber, className = "" }: FFTTIframeProps) {
     );
   }
 
-  console.log("🔍 Rendu iframe:", { iframeHeight, iframeUrl, tableNumber });
-
   return (
     <div className={`relative rounded-lg overflow-hidden ${className}`}>
       <iframe
         src={iframeUrl}
         title={`FFTT Table ${tableNumber}`}
         className="w-full border-0"
-        style={{ height: iframeHeight || "450px" }}
+        style={{ minHeight: "600px" }}
         allow="fullscreen"
         sandbox="allow-scripts allow-same-origin allow-forms"
       />

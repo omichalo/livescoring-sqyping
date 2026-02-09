@@ -8,7 +8,6 @@ import { useState } from "react";
 import { loadIttfMatchesToFirestore } from "@/services/liveScoringService";
 import { getChampionshipId } from "@/lib/firebase-remote-config";
 import { useChampionship } from "@/hooks";
-import type { ChampionshipId } from "@/lib/ittf/types";
 
 interface FirestoreLoaderProps {
   className?: string;
@@ -36,9 +35,8 @@ export function FirestoreLoader({ className = "" }: FirestoreLoaderProps) {
   });
 
   // Charger les données du championnat
-  const { championship, isLoading: loadingChampionship } = useChampionship(
-    champId as ChampionshipId
-  );
+  const { championship, isLoading: loadingChampionship } =
+    useChampionship(champId);
 
   const availableTables =
     championship?.locations

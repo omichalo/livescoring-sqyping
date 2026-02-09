@@ -22,14 +22,14 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   collection,
   onSnapshot,
-  doc,
-  updateDoc,
-  query,
-  where,
-  getDocs,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import type { Encounter, Team } from "../types";
+import {
+  getSelectedEncounterId,
+  setSelectedEncounterId as saveSelectedEncounterId,
+  clearSelectedEncounterId,
+} from "../utils/localStorage";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import StarIcon from "@mui/icons-material/Star";
@@ -45,8 +45,27 @@ export const EncountersListPage: React.FC = () => {
   const [selectedEncounter, setSelectedEncounter] = useState<Encounter | null>(
     null
   );
+  const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
+    // Charger l'encounter sélectionné depuis localStorage
+    const loadSelectedEncounterId = () => {
+      const id = getSelectedEncounterId();
+      setSelectedEncounterId(id);
+    };
+
+    // Charger au montage
+    loadSelectedEncounterId();
+
+    // Écouter les changements de localStorage (depuis d'autres onglets)
+    const handleStorageChange = () => {
+      loadSelectedEncounterId();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
     // Récupérer les rencontres en temps réel
     const unsubscribeEncounters = onSnapshot(
       collection(db, "encounters"),
@@ -79,6 +98,7 @@ export const EncountersListPage: React.FC = () => {
     });
 
     return () => {
+      window.removeEventListener("storage", handleStorageChange);
       unsubscribeEncounters();
       unsubscribeTeams();
     };
@@ -107,56 +127,34 @@ export const EncountersListPage: React.FC = () => {
     );
   };
 
-  const handleSetCurrent = async (encounter: Encounter) => {
+  const handleSetCurrent = (encounter: Encounter) => {
     try {
-      if (encounter.isCurrent) {
-        // Si la rencontre est déjà active, la désactiver
-        await updateDoc(doc(db, "encounters", encounter.id), {
-          isCurrent: false,
-          updatedAt: Date.now(),
-        });
-        console.log(`✅ Rencontre ${encounter.name} désactivée`);
+      const isCurrentlySelected = selectedEncounterId === encounter.id;
+
+      if (isCurrentlySelected) {
+        // Si la rencontre est déjà sélectionnée, la désélectionner
+        clearSelectedEncounterId();
+        setSelectedEncounterId(null);
+        // Déclencher un événement personnalisé pour notifier les autres composants
+        window.dispatchEvent(new Event("encounterSelectionChanged"));
+        console.log(`✅ Rencontre ${encounter.name} désélectionnée`);
       } else {
-        // D'abord, retirer le statut "current" de toutes les autres rencontres
-        const encountersQuery = query(
-          collection(db, "encounters"),
-          where("isCurrent", "==", true)
-        );
-        const currentEncountersSnapshot = await getDocs(encountersQuery);
-
-        if (currentEncountersSnapshot.docs.length > 0) {
-          console.log(
-            `🔄 Désactivation de ${currentEncountersSnapshot.docs.length} rencontre(s) active(s)`
-          );
-        }
-
-        const batch = [];
-        currentEncountersSnapshot.forEach((doc) => {
-          batch.push(updateDoc(doc.ref, { isCurrent: false }));
-        });
-
-        // Ensuite, marquer la rencontre sélectionnée comme actuelle
-        batch.push(
-          updateDoc(doc(db, "encounters", encounter.id), {
-            isCurrent: true,
-            updatedAt: Date.now(),
-          })
-        );
-
-        await Promise.all(batch);
-        console.log(
-          `✅ Rencontre ${encounter.name} activée (${batch.length} opération(s) effectuée(s))`
-        );
+        // Sélectionner la nouvelle rencontre
+        saveSelectedEncounterId(encounter.id); // Sauvegarder dans localStorage
+        setSelectedEncounterId(encounter.id); // Mettre à jour l'état local
+        // Déclencher un événement personnalisé pour notifier les autres composants
+        window.dispatchEvent(new Event("encounterSelectionChanged"));
+        console.log(`✅ Rencontre ${encounter.name} sélectionnée`);
       }
 
       setSetCurrentDialogOpen(false);
       setSelectedEncounter(null);
     } catch (error) {
       console.error(
-        "❌ Erreur lors de la modification de la rencontre actuelle:",
+        "❌ Erreur lors de la sélection de la rencontre:",
         error
       );
-      setError("Erreur lors de la modification de la rencontre actuelle");
+      setError("Erreur lors de la sélection de la rencontre");
     }
   };
 
@@ -220,7 +218,7 @@ export const EncountersListPage: React.FC = () => {
                 "&:hover": {
                   backgroundColor: "action.hover",
                 },
-                backgroundColor: encounter.isCurrent
+                backgroundColor: selectedEncounterId === encounter.id
                   ? "action.selected"
                   : "inherit",
               }}
@@ -232,10 +230,10 @@ export const EncountersListPage: React.FC = () => {
                   <Typography variant="h6" component="span">
                     {encounter.name}
                   </Typography>
-                  {encounter.isCurrent && (
+                  {selectedEncounterId === encounter.id && (
                     <Chip
                       icon={<StarIcon />}
-                      label="En cours"
+                      label="Sélectionnée"
                       color="primary"
                       size="small"
                       variant="filled"
@@ -281,13 +279,13 @@ export const EncountersListPage: React.FC = () => {
                   <IconButton
                     edge="end"
                     aria-label={
-                      encounter.isCurrent
-                        ? "désactiver la rencontre"
-                        : "définir comme rencontre actuelle"
+                      selectedEncounterId === encounter.id
+                        ? "désélectionner la rencontre"
+                        : "sélectionner cette rencontre"
                     }
                     onClick={() => handleOpenSetCurrentDialog(encounter)}
                   >
-                    {encounter.isCurrent ? (
+                    {selectedEncounterId === encounter.id ? (
                       <StarIcon color="primary" />
                     ) : (
                       <StarBorderIcon />
@@ -307,39 +305,40 @@ export const EncountersListPage: React.FC = () => {
         </List>
       )}
 
-      {/* Dialog pour confirmer la définition de la rencontre actuelle */}
+      {/* Dialog pour confirmer la sélection de la rencontre */}
       <Dialog
         open={setCurrentDialogOpen}
         onClose={() => setSetCurrentDialogOpen(false)}
       >
         <DialogTitle>
-          {selectedEncounter?.isCurrent
-            ? "Désactiver la rencontre"
-            : "Définir comme rencontre actuelle"}
+          {selectedEncounter && selectedEncounterId === selectedEncounter.id
+            ? "Désélectionner la rencontre"
+            : "Sélectionner cette rencontre"}
         </DialogTitle>
         <DialogContent>
           <Typography>
-            {selectedEncounter?.isCurrent ? (
+            {selectedEncounter && selectedEncounterId === selectedEncounter.id ? (
               <>
-                Êtes-vous sûr de vouloir désactiver la rencontre "
+                Êtes-vous sûr de vouloir désélectionner la rencontre "
                 {selectedEncounter?.name}" ?
               </>
             ) : (
               <>
-                Êtes-vous sûr de vouloir définir "{selectedEncounter?.name}"
-                comme la rencontre actuelle ?
+                Voulez-vous sélectionner "{selectedEncounter?.name}" comme
+                rencontre active pour ce navigateur ?
               </>
             )}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {selectedEncounter?.isCurrent ? (
+            {selectedEncounter && selectedEncounterId === selectedEncounter.id ? (
               <>
-                Aucune rencontre ne sera active. Les nouvelles fonctionnalités
-                nécessiteront une rencontre active.
+                Aucune rencontre ne sera sélectionnée. Les nouvelles fonctionnalités
+                nécessiteront une rencontre sélectionnée.
               </>
             ) : (
               <>
-                Cela remplacera la rencontre actuellement active. Les nouveaux
+                Cette sélection est locale à ce navigateur. Les autres navigateurs
+                peuvent avoir une rencontre différente sélectionnée. Les nouveaux
                 matchs et joueurs seront associés à cette rencontre.
               </>
             )}
@@ -356,7 +355,9 @@ export const EncountersListPage: React.FC = () => {
             variant="contained"
             color="primary"
           >
-            {selectedEncounter?.isCurrent ? "Désactiver" : "Confirmer"}
+            {selectedEncounter && selectedEncounterId === selectedEncounter.id
+              ? "Désélectionner"
+              : "Confirmer"}
           </Button>
         </DialogActions>
       </Dialog>

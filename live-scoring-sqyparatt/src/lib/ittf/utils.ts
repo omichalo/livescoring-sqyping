@@ -9,7 +9,6 @@ import type {
   ParsedEventKey,
   ParsedPhaseKey,
   MatchStatus,
-  DateInfo,
 } from "./types";
 
 // ============================================================================
@@ -17,7 +16,7 @@ import type {
 // ============================================================================
 
 const ITTF_BASE_URL =
-  import.meta.env.VITE_ITTF_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_ITTF_API_BASE_URL ||
   "https://results.ittf.com/ittf-web-results/html";
 
 /**

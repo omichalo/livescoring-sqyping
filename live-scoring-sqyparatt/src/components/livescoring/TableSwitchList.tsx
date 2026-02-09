@@ -59,6 +59,9 @@ export function TableSwitchList({
           >
             <div className="flex-1">
               <div className="font-medium text-gray-900">{table.Desc}</div>
+              {table.Room && (
+                <div className="text-sm text-gray-500">{table.Room}</div>
+              )}
             </div>
 
             {/* Toggle Switch */}

@@ -63,9 +63,7 @@ async function cleanPlayersAndMatches() {
     encountersSnapshot.forEach((encounterDoc) => {
       const encounterData = encounterDoc.data();
       console.log(
-        `  - ${encounterData.name} (ID: ${encounterDoc.id}, Actuelle: ${
-          encounterData.isCurrent || false
-        })`
+        `  - ${encounterData.name} (ID: ${encounterDoc.id})`
       );
     });
 
@@ -86,13 +84,13 @@ async function cleanPlayersAndMatches() {
     console.log("\n🎉 Nettoyage terminé avec succès !");
     console.log("📝 Vous pouvez maintenant :");
     console.log("   1. Créer une nouvelle rencontre via /encounters/new");
-    console.log("   2. Définir cette rencontre comme active (bouton étoile)");
+    console.log("   2. Sélectionner cette rencontre (bouton étoile)");
     console.log(
       "   3. Recréer les joueurs via la page de création des joueurs"
     );
     console.log("   4. Recréer les matchs via la page de création des matchs");
     console.log(
-      "   5. Les nouveaux joueurs et matchs seront automatiquement associés à la rencontre active"
+      "   5. Les nouveaux joueurs et matchs seront automatiquement associés à la rencontre sélectionnée"
     );
   } catch (error) {
     console.error("❌ Erreur lors du nettoyage:", error);

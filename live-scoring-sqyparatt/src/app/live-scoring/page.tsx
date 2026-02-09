@@ -5,25 +5,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { ChampionshipId } from "@/lib/ittf";
 import type { LiveScoringSettings } from "@/lib/ittf/types";
-import type { ChampionshipId } from "@/lib/ittf/types";
-import { useChampionship, useCurrentEncounter } from "@/hooks";
+import { useChampionship } from "@/hooks";
 import {
   saveLiveScoringSettings,
   loadLiveScoringSettings,
 } from "@/lib/localStorage";
+import { getChampionshipId } from "@/lib/firebase-remote-config";
 import { ModeSelector } from "@/components/livescoring/ModeSelector";
 import { TableSwitchList } from "@/components/livescoring/TableSwitchList";
-import { TableOrderManager } from "@/components/livescoring/TableOrderManager";
+import { DraggableTableGrid } from "@/components/livescoring/DraggableTableGrid";
 import { LoadingSpinner } from "@/components";
-
-// Configuration pour l'export statique
-export const dynamicParams = true;
 
 type Tab = "scoring" | "settings";
 
 export default function LiveScoringPage() {
   const [activeTab, setActiveTab] = useState<Tab>("scoring");
+  const [champId, setChampId] = useState<ChampionshipId | null>(null);
   const [settings, setSettings] = useState<LiveScoringSettings>({
     mode: "tv",
     enabledTables: {},
@@ -34,38 +33,25 @@ export default function LiveScoringPage() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showInitialDateModal, setShowInitialDateModal] = useState(false);
 
-  // Utiliser l'encounter actif au lieu du championnat depuis Remote Config
-  const { currentEncounter, isLoading: loadingEncounter } =
-    useCurrentEncounter();
-  const champId = currentEncounter?.championshipId || null;
+  // Charger le championnat depuis Remote Config
+  useEffect(() => {
+    async function loadChampionship() {
+      const id = await getChampionshipId();
+      setChampId(id as ChampionshipId);
+    }
+    loadChampionship();
+  }, []);
 
   // Charger les données du championnat
-  const {
-    championship,
-    isLoading: loadingChampionship,
-    error: championshipError,
-  } = useChampionship(champId as ChampionshipId);
-
-  // Tables par défaut si l'API ITTF est down (10 tables de 1 à 10)
-  const defaultTables: Array<{ Key: string; Desc: string }> = Array.from(
-    { length: 10 },
-    (_, i) => ({
-      Key: `T${String(i + 1).padStart(2, "0")}`,
-      Desc: `Table ${i + 1}`,
-    })
-  );
-
-  // Utiliser les tables par défaut si l'API est en erreur, sinon les tables du championnat
-  const tablesToUse = championshipError
-    ? defaultTables
-    : championship?.locations || null;
+  const { championship, isLoading: loadingChampionship } =
+    useChampionship(champId);
 
   // Charger les paramètres depuis le localStorage au montage
   useEffect(() => {
     setIsClient(true);
 
     // Charger la date depuis localStorage (dev uniquement)
-    if (import.meta.env.DEV) {
+    if (process.env.NODE_ENV === "development") {
       const savedDate = localStorage.getItem("sqyparatt-dev-date");
       if (savedDate) {
         setSelectedDate(savedDate);
@@ -108,7 +94,7 @@ export default function LiveScoringPage() {
 
   // Sauvegarder la date dans localStorage quand elle change (dev uniquement)
   useEffect(() => {
-    if (isClient && selectedDate && import.meta.env.DEV) {
+    if (isClient && selectedDate && process.env.NODE_ENV === "development") {
       localStorage.setItem("sqyparatt-dev-date", selectedDate);
     }
   }, [selectedDate, isClient]);
@@ -121,7 +107,7 @@ export default function LiveScoringPage() {
 
   // Date à utiliser (selectedDate en dev, aujourd'hui en prod)
   const dateToUse =
-    isClient && import.meta.env.DEV && selectedDate
+    process.env.NODE_ENV === "development" && selectedDate
       ? selectedDate
       : new Date().toISOString().split("T")[0];
 
@@ -133,7 +119,7 @@ export default function LiveScoringPage() {
     : [];
 
   // Afficher la modal de sélection de date en premier (dev uniquement)
-  if (isClient && showInitialDateModal && import.meta.env.DEV) {
+  if (showInitialDateModal && process.env.NODE_ENV === "development") {
     const suggestedDates = [
       { label: "Aujourd'hui", value: new Date().toISOString().split("T")[0] },
       { label: "15 Oct 2025 (TTE5679)", value: "2025-10-15" },
@@ -193,11 +179,11 @@ export default function LiveScoringPage() {
     );
   }
 
-  // Ne pas bloquer si on a une erreur API (on peut utiliser les tables par défaut)
   if (
     !isClient ||
-    loadingEncounter ||
-    (loadingChampionship && !championshipError)
+    !champId ||
+    loadingChampionship ||
+    (process.env.NODE_ENV === "development" && !selectedDate)
   ) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -206,57 +192,21 @@ export default function LiveScoringPage() {
     );
   }
 
-  // Vérification spécifique pour le mode développement après l'hydratation
-  if (isClient && import.meta.env.DEV && !selectedDate) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" message="Chargement..." />
-      </div>
-    );
-  }
-
-  // Si aucun encounter actif, afficher un message
-  if (!currentEncounter) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-md p-12 text-center max-w-md">
-          <svg
-            className="w-24 h-24 text-gray-300 mx-auto mb-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-            />
-          </svg>
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">
-            Aucun encounter actif
-          </h3>
-          <p className="text-gray-600 mb-6">
-            Aucun encounter n&apos;est actuellement en cours. Créez et activez
-            un encounter via la page d&apos;administration.
-          </p>
-          <a
-            href="/admin"
-            className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
-          >
-            <span>⚙️</span>
-            <span className="ml-2">Administration</span>
-          </a>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sélecteur de date (dev uniquement) - Positionné en superposition absolue pour ne pas influencer le layout */}
-      {isClient && import.meta.env.DEV && (
-        <div className="fixed top-2 left-2 z-50 pointer-events-auto">
+    <div
+      className="min-h-screen bg-gray-50"
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+      }}
+    >
+      {/* Sélecteur de date (dev uniquement) */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="fixed top-2 left-2 z-50">
           {!showDatePicker ? (
             <button
               onClick={() => setShowDatePicker(true)}
@@ -278,7 +228,7 @@ export default function LiveScoringPage() {
               </svg>
             </button>
           ) : (
-            <div className="bg-white rounded-lg shadow-xl p-4 border border-gray-200 min-w-[280px] max-w-[320px]">
+            <div className="bg-white rounded-lg shadow-xl p-4 border border-gray-200 min-w-[280px]">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-gray-700">
                   Date (dev)
@@ -400,12 +350,12 @@ export default function LiveScoringPage() {
       </div>
 
       {/* Contenu */}
-      <div className="px-2 py-1 md:px-4 md:py-2 w-full max-w-full overflow-x-hidden">
+      <div className="p-4 md:p-6">
         {activeTab === "scoring" ? (
           /* Onglet Live Scoring */
           activeTables.length > 0 ? (
-            <TableOrderManager
-              champId={champId as ChampionshipId}
+            <DraggableTableGrid
+              champId={champId}
               enabledTables={settings.enabledTables}
               date={dateToUse}
               mode={settings.mode}
@@ -429,7 +379,7 @@ export default function LiveScoringPage() {
                 Aucune table sélectionnée
               </h3>
               <p className="text-gray-600 mb-6">
-                Activez des tables dans l&apos;onglet Paramètres pour commencer
+                Activez des tables dans l'onglet Paramètres pour commencer
               </p>
               <button
                 onClick={() => setActiveTab("settings")}
@@ -442,6 +392,23 @@ export default function LiveScoringPage() {
         ) : (
           /* Onglet Paramètres */
           <div className="max-w-4xl mx-auto space-y-6">
+            {/* Lien vers le chargement des matchs */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">
+                📥 Charger les matchs
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Importez les matchs ITTF vers Firestore pour pouvoir les scorer.
+              </p>
+              <a
+                href="/load-matches"
+                className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+              >
+                <span>📥</span>
+                <span className="ml-2">Charger les matchs</span>
+              </a>
+            </div>
+
             {/* Sélecteur de mode */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <ModeSelector mode={settings.mode} onChange={handleModeChange} />
@@ -452,9 +419,9 @@ export default function LiveScoringPage() {
               <h3 className="text-lg font-bold text-gray-900 mb-4">
                 Tables à afficher
               </h3>
-              {tablesToUse ? (
+              {championship?.locations ? (
                 <TableSwitchList
-                  tables={tablesToUse}
+                  tables={championship.locations}
                   enabledTables={settings.enabledTables}
                   onChange={handleTablesChange}
                 />

@@ -22,6 +22,10 @@ export interface Match {
   score: { player1: number; player2: number }[];
   setsWon: { player1: number; player2: number };
   table?: number;
+  /** Slot ID for streaming (e.g. "A", "B"). Only set when match is assigned during an active broadcast session. */
+  slotId?: string;
+  /** ID of the broadcast session this match belongs to. Only set when match is assigned during an active broadcast session. */
+  broadcastSessionId?: string;
   matchNumber: number;
   type?: "single" | "double"; // Type de match: simple ou double (optionnel pour rétrocompatibilité)
   status: "waiting" | "inProgress" | "finished" | "cancelled";
@@ -40,7 +44,11 @@ export interface Encounter {
   numberOfTables: number; // Nombre de tables disponibles
   createdAt: number;
   updatedAt: number;
-  isCurrent?: boolean; // Marque la rencontre en cours
+  /**
+   * @deprecated Utiliser localStorage pour gérer l'encounter sélectionné par navigateur.
+   * Ce champ est conservé pour la rétrocompatibilité uniquement.
+   */
+  isCurrent?: boolean;
 }
 
 export function createMatch(

@@ -4,28 +4,25 @@
       "collectionGroup": "matches",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "matchNumber",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "matchNumber", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "matches",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "encounterId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "matchNumber",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "encounterId", "order": "ASCENDING" },
+        { "fieldPath": "matchNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "broadcastSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "venueId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
       ]
     }
   ],

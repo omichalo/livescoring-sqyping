@@ -4,10 +4,11 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { loadIttfMatchesToFirestore } from "@/services/liveScoringService";
-import { getChampionshipId } from "@/lib/firebase-remote-config";
-import { useChampionship } from "@/hooks";
+import { createActiveEncounter } from "@/services/encounterService";
+import { useChampionship, useCurrentEncounter } from "@/hooks";
+import type { ChampionshipId } from "@/lib/ittf/types";
 import { LoadingSpinner } from "@/components";
 
 export default function LoadMatchesPage() {
@@ -21,20 +22,16 @@ export default function LoadMatchesPage() {
     errors: number;
     encounterId: string;
   } | null>(null);
-  const [champId, setChampId] = useState<string | null>(null);
 
-  // Charger le championnat depuis Remote Config
-  useEffect(() => {
-    async function loadChampionship() {
-      const id = await getChampionshipId();
-      setChampId(id);
-    }
-    loadChampionship();
-  }, []);
+  // Utiliser l'encounter actif au lieu du championnat depuis Remote Config
+  const { currentEncounter, isLoading: loadingEncounter } =
+    useCurrentEncounter();
+  const champId = currentEncounter?.championshipId || null;
 
   // Charger les données du championnat
-  const { championship, isLoading: loadingChampionship } =
-    useChampionship(champId);
+  const { championship, isLoading: loadingChampionship } = useChampionship(
+    champId as ChampionshipId
+  );
 
   const availableTables =
     championship?.locations
@@ -52,12 +49,21 @@ export default function LoadMatchesPage() {
     setResult(null);
 
     try {
+      // Créer un encounter actif d'abord
+      const encounterId = await createActiveEncounter(
+        champId,
+        selectedDate,
+        selectedTables.length
+      );
+
+      // Charger les matchs dans cet encounter
       const result = await loadIttfMatchesToFirestore(
         champId,
         selectedDate,
-        selectedTables
+        selectedTables,
+        encounterId
       );
-      setResult(result);
+      setResult({ ...result, encounterId });
     } catch (error) {
       console.error("Erreur lors du chargement:", error);
       setResult({ loaded: 0, errors: 1, encounterId: "" });
@@ -82,10 +88,47 @@ export default function LoadMatchesPage() {
     setSelectedTables([]);
   };
 
-  if (loadingChampionship) {
+  if (loadingEncounter || loadingChampionship) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" message="Chargement du championnat..." />
+        <LoadingSpinner size="lg" message="Chargement..." />
+      </div>
+    );
+  }
+
+  // Si aucun encounter actif, afficher un message
+  if (!currentEncounter) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-md p-12 text-center max-w-md">
+          <svg
+            className="w-24 h-24 text-gray-300 mx-auto mb-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
+          </svg>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">
+            Aucun encounter actif
+          </h3>
+          <p className="text-gray-600 mb-6">
+            Aucun encounter n'est actuellement en cours. Créez et activez un
+            encounter via la page d'administration.
+          </p>
+          <a
+            href="/admin"
+            className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+          >
+            <span>⚙️</span>
+            <span className="ml-2">Administration</span>
+          </a>
+        </div>
       </div>
     );
   }
@@ -129,7 +172,7 @@ export default function LoadMatchesPage() {
           {championship && (
             <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <h2 className="text-lg font-semibold text-blue-900 mb-2">
-                {championship.Desc}
+                {championship.champDesc}
               </h2>
               <p className="text-blue-700">
                 Championnat ID:{" "}

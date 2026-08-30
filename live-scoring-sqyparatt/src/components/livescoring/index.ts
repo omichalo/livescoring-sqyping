@@ -11,3 +11,4 @@ export { MatchScoringWrapper } from "./MatchScoringWrapper";
 export { MatchScoreCard } from "./MatchScoreCard";
 export { TableBlock } from "./TableBlock";
 export { DraggableTableGrid } from "./DraggableTableGrid";
+export { TableOrderManager } from "./TableOrderManager";

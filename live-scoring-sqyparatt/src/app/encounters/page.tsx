@@ -5,8 +5,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getChampionshipId } from "@/lib/firebase-remote-config";
-import { useChampionship } from "@/hooks";
+import { useChampionship, useCurrentEncounter } from "@/hooks";
+import type { ChampionshipId } from "@/lib/ittf/types";
 import {
   getEncountersByChampionship,
   getEncounterSummary,
@@ -17,7 +17,6 @@ import type { FirestoreEncounter, EncounterSummary } from "@/types/firestore";
 import { LoadingSpinner } from "@/components";
 
 export default function EncountersPage() {
-  const [champId, setChampId] = useState<string | null>(null);
   const [encounters, setEncounters] = useState<FirestoreEncounter[]>([]);
   const [summaries, setSummaries] = useState<Record<string, EncounterSummary>>(
     {}
@@ -26,16 +25,12 @@ export default function EncountersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
 
-  const { championship } = useChampionship(champId);
+  // Utiliser l'encounter actif au lieu du championnat depuis Remote Config
+  const { currentEncounter, isLoading: loadingEncounter } =
+    useCurrentEncounter();
+  const champId = currentEncounter?.championshipId || null;
 
-  // Charger le championnat
-  useEffect(() => {
-    async function loadChampionship() {
-      const id = await getChampionshipId();
-      setChampId(id);
-    }
-    loadChampionship();
-  }, []);
+  const { championship } = useChampionship(champId as ChampionshipId);
 
   // Charger les encounters
   useEffect(() => {
@@ -163,10 +158,47 @@ export default function EncountersPage() {
     );
   };
 
-  if (isLoading) {
+  if (loadingEncounter || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <LoadingSpinner size="lg" message="Chargement des encounters..." />
+      </div>
+    );
+  }
+
+  // Si aucun encounter actif, afficher un message
+  if (!currentEncounter) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-md p-12 text-center max-w-md">
+          <svg
+            className="w-24 h-24 text-gray-300 mx-auto mb-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
+          </svg>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">
+            Aucun encounter actif
+          </h3>
+          <p className="text-gray-600 mb-6">
+            Aucun encounter n&apos;est actuellement en cours. Créez et activez
+            un encounter via la page d&apos;administration.
+          </p>
+          <a
+            href="/admin"
+            className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+          >
+            <span>⚙️</span>
+            <span className="ml-2">Administration</span>
+          </a>
+        </div>
       </div>
     );
   }
@@ -182,7 +214,7 @@ export default function EncountersPage() {
                 Gestion des Encounters
               </h1>
               {championship && (
-                <p className="mt-2 text-gray-600">{championship.Desc}</p>
+                <p className="mt-2 text-gray-600">{championship.champDesc}</p>
               )}
             </div>
             <div className="flex space-x-3">

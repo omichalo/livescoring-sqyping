@@ -9,7 +9,14 @@ import { MatchScoreCard } from "./MatchScoreCard";
 import type { Match } from "@/types/livescoring";
 import type { FirestoreMatch } from "@/types/firestore-match";
 import type { LiveScoringMatch } from "@/lib/ittf/types";
-import { doc, onSnapshot, addDoc, collection } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  addDoc,
+  collection,
+  updateDoc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface MatchScoringWrapperProps {
@@ -32,9 +39,25 @@ export function MatchScoringWrapper({
         setLoading(true);
         setError(null);
 
-        // Si le match existe déjà dans Firestore, utiliser son ID
+        // Si le match existe déjà dans Firestore, utiliser son ID et mettre à jour le statut
         if (liveScoringMatch.firestoreId) {
           setFirestoreId(liveScoringMatch.firestoreId);
+
+          // Mettre à jour le statut à "inProgress" pour ce match existant
+          try {
+            const docRef = doc(db, "matches", liveScoringMatch.firestoreId);
+            const updateData: any = { status: "inProgress" };
+
+            // startTime sera défini quand l'utilisateur cliquera sur "Lancer"
+
+            await updateDoc(docRef, updateData);
+            console.log(
+              `✅ Statut du match ${liveScoringMatch.firestoreId} mis à jour à "inProgress"`
+            );
+          } catch (err) {
+            console.error("Erreur lors de la mise à jour du statut:", err);
+          }
+
           return;
         }
 
@@ -68,8 +91,8 @@ export function MatchScoringWrapper({
           setsWon: { player1: 0, player2: 0 },
           matchNumber: 0,
           type: "single",
-          status: "waiting",
-          startTime: Date.now(),
+          status: "inProgress", // Match lancé = en cours
+          // startTime sera défini quand l'utilisateur cliquera sur "Lancer"
           encounterId: "",
           order: 0,
         };
@@ -120,9 +143,14 @@ export function MatchScoringWrapper({
       matchNumber: 0,
       type: "single",
       status: "waiting",
-      startTime: Date.now(),
+      // startTime sera défini quand l'utilisateur cliquera sur "Lancer"
       encounterId: "",
       order: 0,
+      matchDesc:
+        liveScoringMatch.matchDesc ||
+        liveScoringMatch.Desc ||
+        liveScoringMatch.phase ||
+        "",
     };
 
     setMatch(convertedMatch);
@@ -158,6 +186,7 @@ export function MatchScoringWrapper({
             startTime: data.startTime,
             encounterId: data.encounterId,
             order: data.order || 0,
+            matchDesc: data.matchDesc || "",
           };
           setMatch(updatedMatch);
         }

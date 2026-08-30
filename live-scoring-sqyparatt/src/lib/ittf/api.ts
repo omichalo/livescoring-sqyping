@@ -44,6 +44,9 @@ function transformRawMatch(raw: RawMatch): Match {
         )
       : [];
 
+    // Pour les noms, on utilise toujours Desc (description de l'équipe)
+    // Pour les doubles, les noms individuels seront stockés séparément dans le mapping Firestore
+
     return {
       matchId: raw.Key,
       phase: raw.Key, // La Key contient la phase
@@ -52,17 +55,28 @@ function transformRawMatch(raw: RawMatch): Match {
       scheduledTime: raw.RTime,
       status: raw.Status,
       Desc: raw.Desc, // Description du match depuis l'API ITTF
+      hasComps: raw.HasComps, // Indique si le match a des compositions détaillées
       team1: {
         names: [raw.Home?.Desc || ""],
         countries: [raw.Home?.Org || ""],
         score: parseInt(raw.Home?.Res || "0") || 0,
         games: homeGames,
+        // Stocker les membres si présents (doubles)
+        members: raw.Home?.Members?.map((m) => ({
+          name: m.Desc,
+          country: m.Org,
+        })),
       },
       team2: {
         names: [raw.Away?.Desc || ""],
         countries: [raw.Away?.Org || ""],
         score: parseInt(raw.Away?.Res || "0") || 0,
         games: awayGames,
+        // Stocker les membres si présents (doubles)
+        members: raw.Away?.Members?.map((m) => ({
+          name: m.Desc,
+          country: m.Org,
+        })),
       },
     };
   } catch (error) {
@@ -112,15 +126,19 @@ class ITTFApiException extends Error {
 
 /**
  * Wrapper générique pour les appels fetch avec gestion d'erreurs
+ * Désactive le cache du navigateur pour toujours obtenir les données à jour
  */
 async function fetchJson<T>(url: string): Promise<T> {
   try {
-    const response = await fetch(url, {
+    // Ajouter un timestamp à l'URL pour éviter le cache du navigateur
+    const separator = url.includes("?") ? "&" : "?";
+    const urlWithCacheBust = `${url}${separator}_t=${Date.now()}`;
+
+    const response = await fetch(urlWithCacheBust, {
       headers: {
         Accept: "application/json",
       },
-      // Cache les données pendant 30 secondes pour éviter trop de requêtes
-      next: { revalidate: 30 },
+      cache: "no-store", // Désactive le cache pour fetch (sans en-têtes personnalisés pour éviter CORS)
     });
 
     if (!response.ok) {

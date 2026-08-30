@@ -17,6 +17,17 @@ export interface RawSplit {
 }
 
 /**
+ * Structure d'un membre dans un double
+ */
+export interface RawMember {
+  /** Nom du joueur */
+  Desc: string;
+
+  /** Code de l'organisation (pays) - ISO 3166-1 alpha-3 */
+  Org: string;
+}
+
+/**
  * Structure d'un participant (joueur ou équipe) dans l'API brute
  */
 export interface RawParticipant {
@@ -43,6 +54,9 @@ export interface RawParticipant {
 
   /** Détail des scores par set */
   Splits: RawSplit[];
+
+  /** Liste des membres en cas de double (si présent) */
+  Members?: RawMember[];
 }
 
 /**

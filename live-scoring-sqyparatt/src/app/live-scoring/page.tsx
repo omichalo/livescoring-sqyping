@@ -7,7 +7,11 @@
 import { useState, useEffect } from "react";
 import type { LiveScoringSettings } from "@/lib/ittf/types";
 import type { ChampionshipId } from "@/lib/ittf/types";
-import { useChampionship, useCurrentEncounter } from "@/hooks";
+import {
+  useChampionship,
+  useCurrentEncounter,
+  usePreventPageReload,
+} from "@/hooks";
 import {
   saveLiveScoringSettings,
   loadLiveScoringSettings,
@@ -33,6 +37,8 @@ export default function LiveScoringPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showInitialDateModal, setShowInitialDateModal] = useState(false);
+
+  usePreventPageReload(settings.mode === "ittf");
 
   // Utiliser l'encounter actif au lieu du championnat depuis Remote Config
   const { currentEncounter, isLoading: loadingEncounter } =
@@ -193,11 +199,11 @@ export default function LiveScoringPage() {
     );
   }
 
-  // Ne pas bloquer si on a une erreur API (on peut utiliser les tables par défaut)
+  // Ne pas démonter le scoring (et donc les iframes ITTF) une fois chargé
   if (
     !isClient ||
-    loadingEncounter ||
-    (loadingChampionship && !championshipError)
+    (loadingEncounter && !currentEncounter) ||
+    (loadingChampionship && !championship && !championshipError)
   ) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -401,46 +407,51 @@ export default function LiveScoringPage() {
 
       {/* Contenu */}
       <div className="px-2 py-1 md:px-4 md:py-2 w-full max-w-full overflow-x-hidden">
-        {activeTab === "scoring" ? (
-          /* Onglet Live Scoring */
-          activeTables.length > 0 ? (
+        {activeTables.length > 0 && (
+          <div
+            className={activeTab === "scoring" ? "block" : "hidden"}
+            aria-hidden={activeTab !== "scoring"}
+          >
             <TableOrderManager
               champId={champId as ChampionshipId}
               enabledTables={settings.enabledTables}
               date={dateToUse}
               mode={settings.mode}
             />
-          ) : (
-            <div className="bg-white rounded-lg shadow-md p-12 text-center">
-              <svg
-                className="w-24 h-24 text-gray-300 mx-auto mb-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Aucune table sélectionnée
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Activez des tables dans l&apos;onglet Paramètres pour commencer
-              </p>
-              <button
-                onClick={() => setActiveTab("settings")}
-                className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
-              >
-                Aller aux Paramètres
-              </button>
-            </div>
-          )
-        ) : (
-          /* Onglet Paramètres */
+          </div>
+        )}
+
+        {activeTab === "scoring" && activeTables.length === 0 && (
+          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+            <svg
+              className="w-24 h-24 text-gray-300 mx-auto mb-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              Aucune table sélectionnée
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Activez des tables dans l&apos;onglet Paramètres pour commencer
+            </p>
+            <button
+              onClick={() => setActiveTab("settings")}
+              className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+            >
+              Aller aux Paramètres
+            </button>
+          </div>
+        )}
+
+        {activeTab === "settings" && (
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Sélecteur de mode */}
             <div className="bg-white rounded-lg shadow-md p-6">

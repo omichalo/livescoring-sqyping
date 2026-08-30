@@ -1,10 +1,12 @@
 /**
- * Composant iframe pour le mode FFTT
+ * Composant iframe pour le mode FFTT / ITTF.
+ * L'appli embarquée ne supporte pas le refresh : on évite tout remount
+ * et on n'écrit `src` que lorsque l'URL change réellement.
  */
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   getITTFIframeUrl,
   buildITTFUrl,
@@ -16,43 +18,67 @@ interface FFTTIframeProps {
   className?: string;
 }
 
-export function FFTTIframe({ tableNumber, className = "" }: FFTTIframeProps) {
+function FFTTIframeComponent({
+  tableNumber,
+  className = "",
+}: FFTTIframeProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const loadedSrcRef = useRef<string>("");
   const [iframeUrl, setIframeUrl] = useState<string>("");
   const [iframeHeight, setIframeHeight] = useState<string>("450px");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadConfig() {
       try {
-        setIsLoading(true);
         setError(null);
 
-        // Charger l'URL et la hauteur en parallèle
         const [baseUrl, height] = await Promise.all([
           getITTFIframeUrl(),
           getIframeHeight(),
         ]);
 
+        if (cancelled) return;
+
         const url = buildITTFUrl(baseUrl, tableNumber);
-        setIframeUrl(url);
-        setIframeHeight(height);
+        setIframeUrl((prev) => (prev === url ? prev : url));
+        setIframeHeight((prev) => (prev === height ? prev : height));
         console.log("📏 Configuration iframe chargée:", { url, height });
       } catch (err) {
         console.error(
           "Erreur lors du chargement de la configuration FFTT:",
           err
         );
-        setError("Impossible de charger l'iframe FFTT");
+        if (!cancelled) {
+          setError("Impossible de charger l'iframe FFTT");
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     }
 
-    loadConfig();
+    void loadConfig();
+
+    return () => {
+      cancelled = true;
+    };
   }, [tableNumber]);
 
-  if (isLoading) {
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframeUrl) return;
+    if (loadedSrcRef.current === iframeUrl) return;
+
+    iframe.src = iframeUrl;
+    loadedSrcRef.current = iframeUrl;
+  }, [iframeUrl]);
+
+  if (isLoading && !iframeUrl) {
     return (
       <div
         className={`flex items-center justify-center bg-gray-100 rounded-lg ${className}`}
@@ -66,7 +92,7 @@ export function FFTTIframe({ tableNumber, className = "" }: FFTTIframeProps) {
     );
   }
 
-  if (error) {
+  if (error && !iframeUrl) {
     return (
       <div
         className={`flex items-center justify-center bg-red-50 border border-red-200 rounded-lg ${className}`}
@@ -92,12 +118,10 @@ export function FFTTIframe({ tableNumber, className = "" }: FFTTIframeProps) {
     );
   }
 
-  console.log("🔍 Rendu iframe:", { iframeHeight, iframeUrl, tableNumber });
-
   return (
     <div className={`relative rounded-lg overflow-hidden ${className}`}>
       <iframe
-        src={iframeUrl}
+        ref={iframeRef}
         title={`FFTT Table ${tableNumber}`}
         className="w-full border-0"
         style={{ height: iframeHeight || "450px" }}
@@ -107,3 +131,5 @@ export function FFTTIframe({ tableNumber, className = "" }: FFTTIframeProps) {
     </div>
   );
 }
+
+export const FFTTIframe = memo(FFTTIframeComponent);

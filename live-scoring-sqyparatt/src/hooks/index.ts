@@ -9,3 +9,4 @@ export { useSmartTournamentStatus } from "./useSmartTournamentStatus";
 export { useLiveScoringMatches } from "./useLiveScoringMatches";
 export { useTableStatus } from "./useTableStatus";
 export { useCurrentEncounter } from "./useCurrentEncounter";
+export { usePreventPageReload } from "./usePreventPageReload";

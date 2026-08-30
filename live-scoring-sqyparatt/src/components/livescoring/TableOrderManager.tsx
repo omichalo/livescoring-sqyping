@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Box, Typography, IconButton } from "@mui/material";
 import { ArrowUpward, ArrowDownward } from "@mui/icons-material";
 import type { ChampionshipId } from "@/lib/ittf/types";
@@ -19,11 +19,27 @@ interface TableItem {
   tableNumber: number;
 }
 
+const CARD_HEIGHT = {
+  xs: "550px",
+  sm: "550px",
+  md: "550px",
+  lg: "550px",
+} as const;
+
+function sameTableOrder(a: TableItem[], b: TableItem[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every(
+    (item, index) =>
+      item.id === b[index]?.id && item.tableNumber === b[index]?.tableNumber
+  );
+}
+
 function TableItemWithControls({
   item,
   champId,
   date,
   mode,
+  visualOrder,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -35,6 +51,7 @@ function TableItemWithControls({
   champId: ChampionshipId;
   date: string;
   mode: "tv" | "ittf";
+  visualOrder: number;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
@@ -46,7 +63,8 @@ function TableItemWithControls({
     <Box
       sx={{
         position: "relative",
-        // Animation conditionnelle pour cette table spécifique
+        // Réordonner visuellement sans déplacer le nœud DOM (un move DOM recharge l'iframe)
+        order: visualOrder,
         ...(animationDirection && {
           filter: "brightness(1.2) saturate(1.3)",
           boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
@@ -186,9 +204,14 @@ export function TableOrderManager({
         tableNumber,
       }));
 
-      setTableOrder([...filteredSavedOrder, ...newTableItems]);
+      const nextOrder = [...filteredSavedOrder, ...newTableItems];
+      setTableOrder((prev) =>
+        sameTableOrder(prev, nextOrder) ? prev : nextOrder
+      );
     } else {
-      setTableOrder(defaultOrder);
+      setTableOrder((prev) =>
+        sameTableOrder(prev, defaultOrder) ? prev : defaultOrder
+      );
     }
   }, [enabledTables]);
 
@@ -248,6 +271,11 @@ export function TableOrderManager({
     }
   };
 
+  const domStableItems = useMemo(
+    () => [...tableOrder].sort((a, b) => a.tableNumber - b.tableNumber),
+    [tableOrder]
+  );
+
   if (tableOrder.length === 0) {
     return (
       <Box textAlign="center" py={4}>
@@ -257,16 +285,6 @@ export function TableOrderManager({
       </Box>
     );
   }
-
-  // Hauteur fixe des cartes (augmentée pour accommoder les noms longs en double et les boutons)
-  const getCardHeight = () => {
-    return {
-      xs: "550px", // Mobile : hauteur fixe
-      sm: "550px", // Tablette : hauteur fixe
-      md: "550px", // Tablette : hauteur fixe
-      lg: "550px", // Desktop : hauteur fixe
-    };
-  };
 
   return (
     <Box
@@ -285,8 +303,9 @@ export function TableOrderManager({
         width: "100%",
         maxWidth: "100%",
         boxSizing: "border-box",
-        overflowY: "auto", // Permet le scroll vertical
-        maxHeight: "calc(100vh - 120px)", // Hauteur maximale pour permettre le scroll
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+        maxHeight: "calc(100vh - 120px)",
         "& > *": {
           transition: "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
           transform: "translateZ(0)", // Force l'accélération matérielle
@@ -344,21 +363,25 @@ export function TableOrderManager({
         },
       }}
     >
-      {tableOrder.map((item, index) => (
-        <TableItemWithControls
-          key={item.id}
-          item={item}
-          champId={champId}
-          date={date}
-          mode={mode}
-          canMoveUp={index > 0}
-          canMoveDown={index < tableOrder.length - 1}
-          onMoveUp={() => moveTableUp(index)}
-          onMoveDown={() => moveTableDown(index)}
-          animationDirection={animatingTables.get(item.id)}
-          cardHeight={getCardHeight()}
-        />
-      ))}
+      {domStableItems.map((item) => {
+        const visualIndex = tableOrder.findIndex((t) => t.id === item.id);
+        return (
+          <TableItemWithControls
+            key={item.id}
+            item={item}
+            champId={champId}
+            date={date}
+            mode={mode}
+            visualOrder={visualIndex}
+            canMoveUp={visualIndex > 0}
+            canMoveDown={visualIndex < tableOrder.length - 1}
+            onMoveUp={() => moveTableUp(visualIndex)}
+            onMoveDown={() => moveTableDown(visualIndex)}
+            animationDirection={animatingTables.get(item.id)}
+            cardHeight={CARD_HEIGHT}
+          />
+        );
+      })}
     </Box>
   );
 }

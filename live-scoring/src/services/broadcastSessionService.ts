@@ -50,13 +50,13 @@ export async function getSession(
  */
 export async function getActiveSessionForVenueAndDate(
   venueId: string,
-  date: string
+  dateKey: string
 ): Promise<BroadcastSession | null> {
   const sessionsRef = collection(db, "broadcastSessions");
   const q = query(
     sessionsRef,
     where("venueId", "==", venueId),
-    where("date", "==", date),
+    where("date", "==", dateKey),
     where("status", "==", "active")
   );
   const snapshot = await getDocs(q);

@@ -16,9 +16,8 @@ export async function resolveSlotToTable(
     const sessionDoc = await getDoc(sessionRef);
     if (!sessionDoc.exists()) return null;
     const session = sessionDoc.data() as BroadcastSession;
-    const mapping = session.slotMappings.find(
-      (m) => m.slotId === slotId && m.isActive
-    );
+    const activeMappings = (session.slotMappings ?? []).filter((m) => m.isActive);
+    const mapping = activeMappings.find((m) => m.slotId === slotId);
     return mapping?.physicalTable ?? null;
   } catch (error) {
     console.error("Error resolving slot to table:", error);
@@ -35,9 +34,8 @@ export async function resolveTableToSlot(
     const sessionDoc = await getDoc(sessionRef);
     if (!sessionDoc.exists()) return null;
     const session = sessionDoc.data() as BroadcastSession;
-    const mapping = session.slotMappings.find(
-      (m) => m.physicalTable === table && m.isActive
-    );
+    const activeMappings = (session.slotMappings ?? []).filter((m) => m.isActive);
+    const mapping = activeMappings.find((m) => m.physicalTable === table);
     return mapping?.slotId ?? null;
   } catch (error) {
     console.error("Error resolving table to slot:", error);
@@ -53,7 +51,7 @@ export async function getSlotMappings(
     const sessionDoc = await getDoc(sessionRef);
     if (!sessionDoc.exists()) return [];
     const session = sessionDoc.data() as BroadcastSession;
-    return session.slotMappings.filter((m) => m.isActive);
+    return (session.slotMappings ?? []).filter((m) => m.isActive);
   } catch (error) {
     console.error("Error getting slot mappings:", error);
     return [];

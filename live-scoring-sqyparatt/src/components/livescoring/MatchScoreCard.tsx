@@ -10,7 +10,6 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Paper,
   Stack,
   Button,
   Dialog,
@@ -52,6 +51,34 @@ function computeSetsWon(
   return setsWon;
 }
 
+function isSetScoreFinished(set: { player1: number; player2: number }): boolean {
+  return (
+    Math.max(set.player1, set.player2) >= 11 &&
+    Math.abs(set.player1 - set.player2) >= 2
+  );
+}
+
+interface SetConfirmState {
+  open: boolean;
+  setNumber: number;
+  winnerName: string;
+  winnerKey: "player1" | "player2";
+  scorePlayer1: number;
+  scorePlayer2: number;
+  revertOnCancel: boolean;
+}
+
+interface MatchConfirmState {
+  open: boolean;
+  winnerName: string;
+  winnerKey: "player1" | "player2";
+  setsWonPlayer1: number;
+  setsWonPlayer2: number;
+  lastSetPlayer1: number;
+  lastSetPlayer2: number;
+  revertOnCancel: boolean;
+}
+
 interface Props {
   match: Match;
   onClose?: () => void; // Callback pour fermer le composant
@@ -75,6 +102,25 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [flipped, setFlipped] = useState(false);
   const [isAddingMilestone, setIsAddingMilestone] = useState(false);
+  const [setConfirm, setSetConfirm] = useState<SetConfirmState>({
+    open: false,
+    setNumber: 0,
+    winnerName: "",
+    winnerKey: "player1",
+    scorePlayer1: 0,
+    scorePlayer2: 0,
+    revertOnCancel: false,
+  });
+  const [matchConfirm, setMatchConfirm] = useState<MatchConfirmState>({
+    open: false,
+    winnerName: "",
+    winnerKey: "player1",
+    setsWonPlayer1: 0,
+    setsWonPlayer2: 0,
+    lastSetPlayer1: 0,
+    lastSetPlayer2: 0,
+    revertOnCancel: false,
+  });
 
   const { currentEncounter } = useCurrentEncounter();
 
@@ -101,9 +147,58 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     );
   };
 
+  const openSetConfirmDialog = (
+    currentSets: { player1: number; player2: number }[],
+    options?: { revertOnCancel?: boolean }
+  ) => {
+    const last = currentSets[currentSets.length - 1];
+    if (!last || !isSetScoreFinished(last)) return;
+
+    const winnerKey: "player1" | "player2" =
+      last.player1 > last.player2 ? "player1" : "player2";
+    const winnerName =
+      winnerKey === "player1" ? match.player1.name : match.player2.name;
+
+    setSetConfirm({
+      open: true,
+      setNumber: currentSets.length,
+      winnerName,
+      winnerKey,
+      scorePlayer1: last.player1,
+      scorePlayer2: last.player2,
+      revertOnCancel: options?.revertOnCancel ?? false,
+    });
+  };
+
+  const openMatchConfirmDialog = (
+    currentSets: { player1: number; player2: number }[],
+    options?: { revertOnCancel?: boolean }
+  ) => {
+    const setsWon = computeSetsWon(currentSets, true);
+    const last = currentSets[currentSets.length - 1];
+    if (!last) return;
+
+    const winnerKey: "player1" | "player2" =
+      setsWon.player1 === 3 ? "player1" : "player2";
+    const winnerName =
+      winnerKey === "player1" ? match.player1.name : match.player2.name;
+
+    setMatchConfirm({
+      open: true,
+      winnerName,
+      winnerKey,
+      setsWonPlayer1: setsWon.player1,
+      setsWonPlayer2: setsWon.player2,
+      lastSetPlayer1: last.player1,
+      lastSetPlayer2: last.player2,
+      revertOnCancel: options?.revertOnCancel ?? false,
+    });
+  };
+
   const updateScore = async (
     playerKey: "player1" | "player2",
-    delta: number
+    delta: number,
+    options?: { skipConfirmDialog?: boolean }
   ) => {
     const updated = [...sets];
     const currentSetIndex = updated.length - 1;
@@ -112,9 +207,7 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     }
     const currentSet = { ...updated[currentSetIndex] };
     const isFifthSet = updated.length === 5;
-    const p1 = currentSet.player1;
-    const p2 = currentSet.player2;
-    const setAlreadyFinished = Math.max(p1, p2) >= 11 && Math.abs(p1 - p2) >= 2;
+    const setAlreadyFinished = isSetScoreFinished(currentSet);
 
     if (delta > 0 && setAlreadyFinished) return;
 
@@ -125,22 +218,16 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     // Calculer les sets gagnés avec le nouveau score
     // Ne PAS inclure le set en cours tant qu'il n'est pas officiellement terminé
     const updatedSetsWon = computeSetsWon(updated, false); // false = exclure le set en cours
-    const isFinished =
-      updatedSetsWon.player1 === 3 || updatedSetsWon.player2 === 3;
+    const setsWonIncludingCurrent = computeSetsWon(updated, true);
+    const matchFinished =
+      setsWonIncludingCurrent.player1 === 3 ||
+      setsWonIncludingCurrent.player2 === 3;
+    const setFinished = isSetScoreFinished(currentSet);
 
     const payload: Partial<Match> = {
       score: updated,
       setsWon: updatedSetsWon,
     };
-
-    // Si le match peut être terminé, afficher le dialog de confirmation
-    // Le match est terminé (un joueur a 3 sets) - prêt pour le bouton "Terminer"
-    if (isFinished) {
-      console.log("🎯 Match prêt à être terminé !", {
-        updatedSetsWon,
-        isFinished,
-      });
-    }
 
     // Gestion du changement de côté à 5 points dans la 5ème manche
     if (shouldFlipAtFiveInFifthSet(isFifthSet, previousSet, currentSet)) {
@@ -149,6 +236,40 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     }
 
     await updateDoc(doc(db, "matches", match.id), payload);
+
+    if (!options?.skipConfirmDialog && delta > 0) {
+      if (matchFinished) {
+        openMatchConfirmDialog(updated, { revertOnCancel: true });
+      } else if (setFinished) {
+        openSetConfirmDialog(updated, { revertOnCancel: true });
+      }
+    }
+  };
+
+  const handleSetConfirmCancel = async () => {
+    const { winnerKey, revertOnCancel } = setConfirm;
+    setSetConfirm((prev) => ({ ...prev, open: false }));
+    if (revertOnCancel) {
+      await updateScore(winnerKey, -1, { skipConfirmDialog: true });
+    }
+  };
+
+  const handleSetConfirmAccept = async () => {
+    setSetConfirm((prev) => ({ ...prev, open: false }));
+    await launchSet();
+  };
+
+  const handleMatchConfirmCancel = async () => {
+    const { winnerKey, revertOnCancel } = matchConfirm;
+    setMatchConfirm((prev) => ({ ...prev, open: false }));
+    if (revertOnCancel) {
+      await updateScore(winnerKey, -1, { skipConfirmDialog: true });
+    }
+  };
+
+  const handleMatchConfirmAccept = async () => {
+    setMatchConfirm((prev) => ({ ...prev, open: false }));
+    await terminateMatch();
   };
 
   const resetMatch = async () => {
@@ -187,10 +308,7 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
 
   const launchSet = async () => {
     const last = sets[sets.length - 1];
-    const finished =
-      last &&
-      Math.max(last.player1, last.player2) >= 11 &&
-      Math.abs(last.player1 - last.player2) >= 2;
+    const finished = last && isSetScoreFinished(last);
     const alreadyEmptySet = last && last.player1 === 0 && last.player2 === 0;
     if (!finished || alreadyEmptySet) return;
 
@@ -406,10 +524,7 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
     if (isFinished) return false;
 
     const last = sets[sets.length - 1];
-    const finished =
-      last &&
-      Math.max(last.player1, last.player2) >= 11 &&
-      Math.abs(last.player1 - last.player2) >= 2;
+    const finished = last && isSetScoreFinished(last);
     const alreadyEmptySet = last && last.player1 === 0 && last.player2 === 0;
     return finished && !alreadyEmptySet;
   })();
@@ -469,8 +584,7 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
                       const set = sets[setIdx];
                       const p1 = set?.player1 ?? 0;
                       const p2 = set?.player2 ?? 0;
-                      const finished =
-                        Math.max(p1, p2) >= 11 && Math.abs(p1 - p2) >= 2;
+                      const finished = set ? isSetScoreFinished(set) : false;
                       const score = idx === 0 ? p1 : p2;
                       const isCurrent = !finished && setIdx === sets.length - 1;
                       return (
@@ -691,10 +805,10 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
           {canLaunchSet && !isFinished && (
             <Button
               variant="outlined"
-              onClick={launchSet}
-              title="Commencer un nouveau set"
+              onClick={() => openSetConfirmDialog(sets)}
+              title="Valider la manche et commencer la suivante"
             >
-              ⏱ Lancer Set
+              ⏱ Valider la manche
             </Button>
           )}
           {currentEncounter &&
@@ -727,10 +841,10 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
             <Button
               variant="contained"
               color="success"
-              onClick={terminateMatch}
+              onClick={() => openMatchConfirmDialog(sets)}
               title="Terminer le match et revenir à la liste"
             >
-              🏆 Terminer & Retour
+              🏆 Terminer le match
             </Button>
           )}
           {onClose && (
@@ -746,6 +860,68 @@ export const MatchScoreCard: React.FC<Props> = ({ match, onClose }) => {
         </Stack>
       </Box>
       {/* </Paper> */}
+
+      <Dialog
+        open={setConfirm.open}
+        onClose={() => void handleSetConfirmCancel()}
+      >
+        <DialogTitle>Fin de manche</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Confirmer que la manche {setConfirm.setNumber} a été remportée par{" "}
+            <strong>{setConfirm.winnerName}</strong> sur le score de{" "}
+            <strong>
+              {setConfirm.scorePlayer1} à {setConfirm.scorePlayer2}
+            </strong>{" "}
+            ?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => void handleSetConfirmCancel()}>
+            Non, corriger
+          </Button>
+          <Button
+            onClick={() => void handleSetConfirmAccept()}
+            variant="contained"
+            color="primary"
+          >
+            Oui, manche validée
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={matchConfirm.open}
+        onClose={() => void handleMatchConfirmCancel()}
+      >
+        <DialogTitle>Fin de match</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Confirmer la victoire de <strong>{matchConfirm.winnerName}</strong>{" "}
+            sur le score de{" "}
+            <strong>
+              {matchConfirm.setsWonPlayer1} à {matchConfirm.setsWonPlayer2}
+            </strong>{" "}
+            en sets
+            {matchConfirm.lastSetPlayer1 > 0 || matchConfirm.lastSetPlayer2 > 0
+              ? ` (dernière manche : ${matchConfirm.lastSetPlayer1} à ${matchConfirm.lastSetPlayer2})`
+              : ""}
+            ?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => void handleMatchConfirmCancel()}>
+            Non, corriger
+          </Button>
+          <Button
+            onClick={() => void handleMatchConfirmAccept()}
+            variant="contained"
+            color="success"
+          >
+            Oui, match terminé
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={confirmResetOpen}
